@@ -1,0 +1,8 @@
+# Editor Specific
+.vscode/
+
+# Build Directory
+build/
+
+# pyc Code
+test/__pycache__/
