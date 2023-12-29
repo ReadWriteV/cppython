@@ -2,74 +2,83 @@
 
 #include "object/klass.hpp"
 #include "object/object.hpp"
+#include "runtime/static_value.hpp"
+#include "utils/map.hpp"
 #include "utils/singleton.hpp"
 
 #include <string>
-#include <unordered_map>
 
 namespace cppython {
 
 class string;
+class oop_closure;
 
 class dict_klass : public klass, public singleton<dict_klass> {
 public:
   void initialize();
 
-  std::string to_string(std::shared_ptr<object> obj) override;
-  std::shared_ptr<object> subscr(std::shared_ptr<object> x,
-                                 std::shared_ptr<object> y) override;
+  std::string to_string(object *obj) override;
+  object *subscr(object *x, object *y) override;
 
-  std::shared_ptr<object> iter(std::shared_ptr<object> x) override;
-  void store_subscr(std::shared_ptr<object> x, std::shared_ptr<object> y,
-                    std::shared_ptr<object> z) override;
-  void del_subscr(std::shared_ptr<object> x,
-                  std::shared_ptr<object> y) override;
+  object *iter(object *x) override;
+  void store_subscr(object *x, object *y, object *z) override;
+  void del_subscr(object *x, object *y) override;
 
-  virtual std::shared_ptr<object> getattr(std::shared_ptr<object> x,
-                                          std::shared_ptr<string> y);
+  virtual object *getattr(object *x, string *y);
 
-  std::shared_ptr<object> allocate_instance(
-      std::shared_ptr<object> obj_type,
-      std::shared_ptr<std::vector<std::shared_ptr<object>>> args) override;
+  object *allocate_instance(object *obj_type, vector<object *> *args) override;
+
+  void oops_do(oop_closure *closure, object *obj) override;
+  size_t size() const override;
 };
 
 class dict : public object {
 public:
-  template <typename... Args>
-  dict(Args &&...args) : value{std::forward<Args>(args)...} {
+  using klass_type = dict_klass;
+
+public:
+  dict() : value{new map<object *, object *>{}} {
+    set_klass(dict_klass::get_instance());
+  }
+  dict(map<object *, object *> *m) : value{m} {
     set_klass(dict_klass::get_instance());
   }
 
-  auto &get_value() { return value; }
+  auto get_value() { return value; }
+  auto &data_address() { return value; }
 
-  auto size() { return value.size(); }
+  auto size() { return value->size(); }
 
-  bool has_key(std::shared_ptr<object> k);
-  void insert(std::shared_ptr<object> k, std::shared_ptr<object> v) {
-    value.insert_or_assign(k, v);
+  /// @brief return value of key k, or std::nullopt if not exists
+  /// @tparam PredicateOperation
+  /// @param k
+  /// @param pred
+  /// @return
+  template <typename PredicateOperation>
+    requires std::predicate<PredicateOperation, object *, object *>
+  std::optional<object *> get(object *k, PredicateOperation pred) {
+    return value->get(k, pred);
   }
-  std::shared_ptr<object> at(std::shared_ptr<object> k);
-  std::shared_ptr<object> remove(std::shared_ptr<object> k);
 
-  static std::shared_ptr<object>
-  dict_set_default(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
-  static std::shared_ptr<object>
-  dict_remove(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
-  static std::shared_ptr<object>
-  dict_keys(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
-  static std::shared_ptr<object>
-  dict_values(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
-  static std::shared_ptr<object>
-  dict_items(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
-  static std::shared_ptr<object>
-  dict_iterkeys(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
-  static std::shared_ptr<object>
-  dict_itervalues(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
-  static std::shared_ptr<object>
-  dict_iteritems(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
+  bool has_key(object *k) { return value->has_key(k, value_equal{}); }
+  void insert(object *k, object *v) { value->insert(k, v, value_equal{}); }
+  /// @brief return value of key k, or none_value if not exists
+  /// @param k
+  /// @return
+  object *at(object *k);
+  object *remove(object *k) { return value->remove(k, value_equal{}); }
+
+  static object *dict_set_default(vector<object *> *args);
+  static object *dict_remove(vector<object *> *args);
+  static object *dict_keys(vector<object *> *args);
+  static object *dict_values(vector<object *> *args);
+  static object *dict_items(vector<object *> *args);
+  static object *dict_iterkeys(vector<object *> *args);
+  static object *dict_itervalues(vector<object *> *args);
+  static object *dict_iteritems(vector<object *> *args);
 
 private:
-  std::unordered_map<std::shared_ptr<object>, std::shared_ptr<object>> value;
+  map<object *, object *> *value{nullptr};
 };
 
 enum iter_type { iter_key = 0, iter_value, iter_item };
@@ -82,24 +91,22 @@ private:
   friend class singleton<dict_iterator_klass<n>>;
 
 public:
-  std::shared_ptr<object> iter(std::shared_ptr<object> x) override { return x; }
+  object *iter(object *x) override { return x; }
 };
 
 class dict_iterator : public object {
-
 public:
-  dict_iterator(std::shared_ptr<dict> owner);
+  dict_iterator(dict *owner);
 
   auto get_owner() { return dic; }
   int get_iter_cnt() { return iter_cnt; }
   void inc_cnt() { iter_cnt++; }
 
   template <iter_type n>
-  static std::shared_ptr<object> dict_iterator_next(
-      std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
+  static object *dict_iterator_next(vector<object *> *args);
 
 private:
-  std::shared_ptr<dict> dic;
+  dict *dic{nullptr};
   int iter_cnt{0};
 };
 

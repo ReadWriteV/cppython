@@ -1,25 +1,32 @@
 #pragma once
 
 #include "object/string.hpp"
+#include "utils/singleton.hpp"
 
 namespace cppython {
 
-class string_table {
+class oop_closure;
+
+class string_table : public singleton<string_table> {
+  friend class singleton<string_table>;
+
+private:
   string_table();
 
 public:
-  static string_table *get_instance();
+  void oops_do(oop_closure *f);
 
-  std::shared_ptr<string> next_str;
-  std::shared_ptr<string> mod_str;
-  std::shared_ptr<string> init_str;
-  std::shared_ptr<string> add_str;
-  std::shared_ptr<string> len_str;
-  std::shared_ptr<string> call_str;
-  std::shared_ptr<string> getitem_str;
-  std::shared_ptr<string> setitem_str;
-  std::shared_ptr<string> getattr_str;
-  std::shared_ptr<string> setattr_str;
+public:
+  string *next_str{nullptr};
+  string *mod_str{nullptr};
+  string *init_str{nullptr};
+  string *add_str{nullptr};
+  string *len_str{nullptr};
+  string *call_str{nullptr};
+  string *getitem_str{nullptr};
+  string *setitem_str{nullptr};
+  string *getattr_str{nullptr};
+  string *setattr_str{nullptr};
 };
 
 } // namespace cppython

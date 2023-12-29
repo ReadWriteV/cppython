@@ -1,16 +1,17 @@
 #include "runtime/interpreter.hpp"
 #include "code/bytecode.hpp"
 #include "code/code_object.hpp"
+#include "memory/oop_closure.hpp"
 #include "object/dict.hpp"
 #include "object/integer.hpp"
 #include "object/list.hpp"
 #include "object/object.hpp"
+#include "object/tuple.hpp"
 #include "runtime/cell.hpp"
 #include "runtime/function.hpp"
 #include "runtime/static_value.hpp"
 #include "runtime/string_table.hpp"
 
-#include "interpreter.hpp"
 #include <cassert>
 #include <functional>
 #include <optional>
@@ -19,41 +20,36 @@
 using namespace cppython;
 
 interpreter::interpreter() {
-  builtins = std::make_shared<dict>();
+  builtins = new dict{};
 
   // builtin values
-  builtins->insert(std::make_shared<string>("True"), static_value::true_value);
-  builtins->insert(std::make_shared<string>("False"),
-                   static_value::false_value);
-  builtins->insert(std::make_shared<string>("None"), static_value::none_value);
+  builtins->insert(new string("True"), static_value::true_value);
+  builtins->insert(new string("False"), static_value::false_value);
+  builtins->insert(new string("None"), static_value::none_value);
 
   // builtin functions
-  builtins->insert(std::make_shared<string>("print"),
-                   std::make_shared<function>(print));
-  builtins->insert(std::make_shared<string>("len"),
-                   std::make_shared<function>(len));
-  builtins->insert(std::make_shared<string>("type"),
-                   std::make_shared<function>(type_of));
-  builtins->insert(std::make_shared<string>("isinstance"),
-                   std::make_shared<function>(isinstance));
-  builtins->insert(std::make_shared<string>("type"),
-                   std::make_shared<function>(builtin_super));
+  builtins->insert(new string("print"), new native_function(print));
+  builtins->insert(new string("len"), new native_function(len));
+  builtins->insert(new string("type"), new native_function(type_of));
+  builtins->insert(new string("isinstance"), new native_function(isinstance));
+  builtins->insert(new string("super"), new native_function(builtin_super));
+  builtins->insert(new string("sysgc"), new native_function{sysgc});
 
   // builtin classes
-  builtins->insert(std::make_shared<string>("object"),
+  builtins->insert(new string("object"),
                    object_klass::get_instance()->get_type_object());
-  builtins->insert(std::make_shared<string>("int"),
+  builtins->insert(new string("int"),
                    integer_klass::get_instance()->get_type_object());
-  builtins->insert(std::make_shared<string>("str"),
+  builtins->insert(new string("str"),
                    string_klass::get_instance()->get_type_object());
-  builtins->insert(std::make_shared<string>("list"),
+  builtins->insert(new string("list"),
                    list_klass::get_instance()->get_type_object());
-  builtins->insert(std::make_shared<string>("dict"),
+  builtins->insert(new string("dict"),
                    dict_klass::get_instance()->get_type_object());
 }
 
-void interpreter::run(std::shared_ptr<code_object> codes) {
-  cur_frame = std::make_shared<frame>(codes);
+void interpreter::run(code_object *codes) {
+  cur_frame = new frame{codes};
   eval_frame();
   destroy_frame();
 }
@@ -62,29 +58,31 @@ void interpreter::eval_frame() {
 
   while (cur_frame->has_more_codes()) {
     auto op_code = cur_frame->get_op_code();
-    bool has_argument = (op_code & 0xFF) >= bytecode::HAVE_ARGUMENT;
+    bool has_argument =
+        (op_code & 0xFF) >= std::to_underlying(bytecode::HAVE_ARGUMENT);
 
     int op_arg = -1;
     if (has_argument) {
       op_arg = cur_frame->get_op_arg();
     }
 
-    switch (op_code) {
-    case bytecode::NOP:
+    switch (auto op = static_cast<bytecode>(op_code); op) {
+      using enum bytecode;
+    case NOP:
       break;
 
-    case bytecode::POP_TOP:
+    case POP_TOP:
       pop_data();
       break;
 
-    case bytecode::ROT_TWO: {
+    case ROT_TWO: {
       auto x = pop_data();
       auto y = pop_data();
       push_data(x);
       push_data(y);
       break;
     }
-    case bytecode::ROT_THREE: {
+    case ROT_THREE: {
       auto x = pop_data();
       auto y = pop_data();
       auto z = pop_data();
@@ -93,11 +91,11 @@ void interpreter::eval_frame() {
       push_data(y);
       break;
     }
-    case bytecode::DUP_TOP: {
+    case DUP_TOP: {
       push_data(top_data());
       break;
     }
-    case bytecode::DUP_TOP_TWO: {
+    case DUP_TOP_TWO: {
       auto x = pop_data();
       auto y = pop_data();
       push_data(y);
@@ -106,86 +104,93 @@ void interpreter::eval_frame() {
       push_data(x);
       break;
     }
-    case bytecode::INPLACE_ADD: {
-    case bytecode::BINARY_ADD: {
+    case INPLACE_MODULO:
+    case BINARY_MODULO: {
+      auto v = pop_data();
+      auto w = pop_data();
+      push_data(w->mod(v));
+      break;
+    }
+    case INPLACE_ADD: {
+    case BINARY_ADD: {
       auto v = pop_data();
       auto w = pop_data();
       push_data(w->add(v));
       break;
     }
-    case bytecode::BINARY_SUBTRACT: {
+    case BINARY_SUBTRACT: {
       auto v = pop_data();
       auto w = pop_data();
       push_data(w->sub(v));
       break;
     }
-    case bytecode::BINARY_MULTIPLY: {
+    case BINARY_MULTIPLY: {
       auto v = pop_data();
       auto w = pop_data();
       push_data(w->mul(v));
       break;
     }
 
-    case bytecode::BINARY_SUBSCR: {
+    case BINARY_SUBSCR: {
       auto v = pop_data();
       auto w = pop_data();
       push_data(w->subscr(v));
       break;
     }
-    case bytecode::STORE_MAP: {
+    case STORE_MAP: {
       auto k = pop_data();
       auto v = pop_data();
       auto m = pop_data();
-      std::static_pointer_cast<dict>(m)->insert(k, v);
+      m->as<dict>()->insert(k, v);
       break;
     }
 
-    case bytecode::STORE_SUBSCR: {
+    case STORE_SUBSCR: {
       auto u = pop_data();
       auto v = pop_data();
       auto w = pop_data();
       v->store_subscr(u, w);
       break;
     }
-    case bytecode::DELETE_SUBSCR: {
+    case DELETE_SUBSCR: {
       auto v = pop_data();
       auto w = pop_data();
       w->del_subscr(v);
       break;
     }
 
-    case bytecode::GET_ITER: {
+    case GET_ITER: {
       auto v = pop_data();
       push_data(v->iter());
       break;
     }
 
-    case bytecode::LOAD_BUILD_CLASS: {
-      push_data(std::make_shared<function>(cppython::build_class));
+    case LOAD_BUILD_CLASS: {
+      push_data(new native_function{cppython::build_class});
       break;
     }
 
-    case bytecode::UNPACK_SEQUENCE: {
+    case UNPACK_SEQUENCE: {
       auto v = pop_data();
       while (op_arg--) {
-        push_data(v->subscr(std::make_shared<integer>(op_arg)));
+        push_data(v->subscr(new integer{op_arg}));
       }
       break;
     }
-    case bytecode::FOR_ITER: {
-      auto v = cur_frame->get_data_stack().top();
+    case FOR_ITER: {
+      auto v = top_data();
 
       auto w = v->getattr(string_table::get_instance()->next_str);
 
       build_frame(w, nullptr);
 
-      if (cur_frame->get_data_stack().top() == nullptr) {
+      if (top_data() == nullptr) {
         cur_frame->set_pc(cur_frame->get_pc() + op_arg);
-        cur_frame->get_data_stack().pop();
+        pop_data();
       }
       break;
     }
-    case bytecode::IS_OP: {
+    case IS_OP: {
       auto v = pop_data();
       auto w = pop_data();
       if (v == w) {
@@ -196,21 +201,21 @@ void interpreter::eval_frame() {
       break;
     }
 
-    case bytecode::BREAK_LOOP:
-      while (!cur_frame->get_data_stack().empty() &&
-             cur_frame->get_data_stack().size() >
+    case BREAK_LOOP:
+      while (!cur_frame->get_data_stack()->empty() &&
+             cur_frame->get_data_stack()->size() >
                  cur_frame->get_loop_stack().top().level) {
-        cur_frame->get_data_stack().pop();
+        pop_data();
       }
       cur_frame->set_pc(cur_frame->get_loop_stack().top().target);
       cur_frame->get_loop_stack().pop();
       break;
 
-    case bytecode::LOAD_LOCALS:
+    case LOAD_LOCALS:
       push_data(cur_frame->get_locals());
       break;
 
-    case bytecode::RETURN_VALUE: {
+    case RETURN_VALUE: {
       ret_value = pop_data();
       if (cur_frame->is_first_frame() || cur_frame->is_entry_frame()) {
         return;
@@ -219,118 +224,111 @@ void interpreter::eval_frame() {
       break;
     }
 
-    case bytecode::POP_BLOCK:
-      while (!cur_frame->get_data_stack().empty() &&
-             cur_frame->get_data_stack().size() >
+    case POP_BLOCK:
+      while (!cur_frame->get_data_stack()->empty() &&
+             cur_frame->get_data_stack()->size() >
                  cur_frame->get_loop_stack().top().level) {
-        cur_frame->get_data_stack().pop();
+        pop_data();
       }
       cur_frame->get_loop_stack().pop();
       break;
 
-    case bytecode::STORE_NAME: {
+    case STORE_NAME: {
       auto v = cur_frame->get_names()->at(op_arg);
       cur_frame->get_locals()->insert(v, pop_data());
       break;
     }
-    case bytecode::STORE_ATTR: {
+    case STORE_ATTR: {
       auto u = pop_data();
       auto v = cur_frame->get_names()->at(op_arg);
       auto w = pop_data();
       u->setattr(v, w);
       break;
     }
-    case bytecode::STORE_GLOBAL: {
+    case STORE_GLOBAL: {
       auto v = cur_frame->get_names()->at(op_arg);
       cur_frame->get_globals()->insert(v, pop_data());
       break;
     }
 
-    case bytecode::LOAD_CONST:
+    case LOAD_CONST:
       push_data(cur_frame->get_consts()->at(op_arg));
       break;
 
     // Local, Enclosing, Global, Builtin
-    case bytecode::LOAD_NAME: {
+    case LOAD_NAME: {
       auto target_name = cur_frame->get_names()->at(op_arg);
 
-      auto map_finder = [&target_name](auto &&map) {
-        auto iter = std::find_if(
-            map->get_value().begin(), map->get_value().end(),
-            [&target_name](auto &&x) {
-              return x.first->equal(target_name) == static_value::true_value;
-            });
-        return iter == map->get_value().end()
-                   ? std::nullopt
-                   : std::make_optional(iter->second);
-      };
+      auto r = cur_frame->get_locals()
+                   ->get(target_name, value_equal{})
+                   .or_else([this, &target_name]() {
+                     return cur_frame->get_globals()->get(target_name,
+                                                          value_equal{});
+                   })
+                   .or_else([this, &target_name]() {
+                     return builtins->get(target_name, value_equal{});
+                   })
+                   .value_or(static_value::none_value);
 
-      auto target_value =
-          map_finder(cur_frame->get_locals())
-              .or_else(std::bind(map_finder, cur_frame->get_globals()))
-              .or_else(std::bind(map_finder, builtins));
-      push_data(target_value.value_or(static_value::none_value));
+      push_data(r);
       break;
     }
-    case bytecode::BUILD_TUPLE: {
-      std::vector<std::shared_ptr<object>> tmp;
-      tmp.resize(op_arg);
-
+    case BUILD_TUPLE: {
+      auto tmp = new vector<object *>{};
       while (op_arg--) {
-        tmp.at(op_arg) = pop_data();
+        tmp->set(op_arg, pop_data());
       }
-      push_data(std::make_shared<tuple>(std::move(tmp)));
+      push_data(new tuple{tmp});
       break;
     }
-    case bytecode::BUILD_LIST: {
-      auto lst = std::make_shared<list>();
-      lst->resize(op_arg);
-
+    case BUILD_LIST: {
+      auto lst = new list{};
       while (op_arg--) {
-        lst->at(op_arg) = pop_data();
+        lst->set_at(op_arg, pop_data());
       }
       push_data(lst);
       break;
     }
-    case bytecode::BUILD_MAP: {
-      auto v = std::make_shared<dict>();
-      push_data(v);
+    case BUILD_MAP: {
+      push_data(new dict{});
       break;
     }
 
-    case bytecode::LOAD_ATTR: {
+    case LOAD_ATTR: {
       auto v = pop_data();
       auto w = cur_frame->get_names()->at(op_arg);
       push_data(v->getattr(w));
       break;
     }
-    case bytecode::COMPARE_OP: {
+    case COMPARE_OP: {
       auto w = pop_data();
       auto v = pop_data();
 
-      switch (op_arg) {
-      case bytecode::compare::less:
+      auto cmp_flag = static_cast<compare>(op_arg);
+      switch (cmp_flag) {
+        using enum compare;
+      case less:
         push_data(v->less(w));
         break;
-      case bytecode::compare::less_equal:
+      case less_equal:
         push_data(v->le(w));
         break;
-      case bytecode::compare::equal:
+      case equal:
         push_data(v->equal(w));
         break;
-      case bytecode::compare::not_equal:
+      case not_equal:
         push_data(v->not_equal(w));
         break;
-      case bytecode::compare::greater:
+      case greater:
         push_data(v->greater(w));
         break;
-      case bytecode::compare::greater_equal:
+      case greater_equal:
         push_data(v->ge(w));
         break;
-      case bytecode::compare::in:
+      case in:
         push_data(w->contains(v));
         break;
-      case bytecode::compare::not_in: {
+      case not_in: {
         auto r = w->contains(v);
         if (r == static_value::true_value) {
           push_data(static_value::false_value);
@@ -339,7 +337,7 @@ void interpreter::eval_frame() {
         }
         break;
       }
-      case bytecode::compare::is:
+      case is:
         if (v == w) {
           push_data(static_value::true_value);
         } else {
@@ -347,7 +345,7 @@ void interpreter::eval_frame() {
         };
         break;
 
-      case bytecode::compare::is_not:
+      case is_not:
         if (v == w) {
           push_data(static_value::false_value);
         } else {
@@ -360,15 +358,15 @@ void interpreter::eval_frame() {
       break;
     }
 
-    case bytecode::JUMP_FORWARD:
+    case JUMP_FORWARD:
       cur_frame->set_pc(cur_frame->get_pc() + op_arg);
       break;
 
-    case bytecode::JUMP_ABSOLUTE:
+    case JUMP_ABSOLUTE:
       cur_frame->set_pc(op_arg);
       break;
 
-    case bytecode::POP_JUMP_IF_FALSE: {
+    case POP_JUMP_IF_FALSE: {
       auto v = pop_data();
       if (v == static_value::false_value) {
         cur_frame->set_pc(op_arg);
@@ -376,55 +374,46 @@ void interpreter::eval_frame() {
       break;
     }
 
-    case bytecode::LOAD_GLOBAL: {
+    case LOAD_GLOBAL: {
       auto target_name = cur_frame->get_names()->at(op_arg);
 
-      auto map_finder = [&target_name](auto &&map) {
-        auto iter = std::find_if(
-            map->get_value().begin(), map->get_value().end(),
-            [&target_name](auto &&x) {
-              return x.first->equal(target_name) == static_value::true_value;
-            });
-        return iter == map->get_value().end()
-                   ? std::nullopt
-                   : std::make_optional(iter->second);
-      };
-
-      auto target_value = map_finder(cur_frame->get_globals())
-                              .or_else(std::bind(map_finder, builtins));
-      push_data(target_value.value_or(static_value::none_value));
-
+      auto r = cur_frame->get_globals()
+                   ->get(target_name, value_equal{})
+                   .or_else([this, &target_name]() {
+                     return builtins->get(target_name, value_equal{});
+                   })
+                   .value_or(static_value::none_value);
+      push_data(r);
       break;
     }
 
-    case bytecode::CONTAINS_OP: {
+    case CONTAINS_OP: {
       auto lst = pop_data();
       auto value = pop_data();
       push_data(lst->contains(value));
       break;
     }
 
-    case bytecode::SETUP_LOOP:
+    case SETUP_LOOP:
       cur_frame->get_loop_stack().push({op_code, cur_frame->get_pc() + op_arg,
-                                        cur_frame->get_data_stack().size()});
+                                        cur_frame->get_data_stack()->size()});
       break;
 
-    case bytecode::LOAD_FAST:
+    case LOAD_FAST:
       push_data(cur_frame->get_fast_locals()->at(op_arg));
       break;
 
-    case bytecode::STORE_FAST:
+    case STORE_FAST:
       cur_frame->get_fast_locals()->set_at(op_arg, pop_data());
       break;
 
-    case bytecode::CALL_FUNCTION: {
-      std::shared_ptr<std::vector<std::shared_ptr<object>>> args;
+    case CALL_FUNCTION: {
+      vector<object *> *args{nullptr};
       if (op_arg > 0) {
-        args = std::make_shared<std::vector<std::shared_ptr<object>>>();
-        args->resize(op_arg);
+        args = new vector<object *>{};
         int i{op_arg};
         while (i--) {
-          args->at(i) = pop_data();
+          args->set(i, pop_data());
         }
       }
       auto func = pop_data();
@@ -433,22 +422,20 @@ void interpreter::eval_frame() {
       break;
     }
 
-    case bytecode::MAKE_FUNCTION: {
+    case MAKE_FUNCTION: {
       //[Changed in version 3.11: Qualified name at STACK[-1] was removed.]
       pop_data(); // Qualified name
 
       auto v = pop_data();
 
-      auto func = std::make_shared<function>(v);
+      auto func = new function{v};
       func->set_globals(cur_frame->get_globals());
 
       if (op_arg & 0x08) {
         // a tuple containing cells for free variables, making a closure
         auto free_args = pop_data();
-        assert(free_args &&
-               free_args->get_klass() == tuple_klass::get_instance());
-        auto tpl_def_args = std::static_pointer_cast<tuple>(free_args);
-        auto args = std::make_shared<list>(tpl_def_args->get_value());
+        auto tpl_def_args = free_args->as<tuple>();
+        auto args = new list{tpl_def_args->get_value()};
         func->set_closure(args);
       }
       if (op_arg & 0x04) {
@@ -463,63 +450,57 @@ void interpreter::eval_frame() {
         // a tuple of default values for positional-only and
         // positional-or-keyword parameters in positional order
         auto def_args = pop_data();
-        assert(def_args &&
-               def_args->get_klass() == tuple_klass::get_instance());
-        auto tpl_def_args = std::static_pointer_cast<tuple>(def_args);
-        auto args = std::make_shared<std::vector<std::shared_ptr<object>>>(
-            tpl_def_args->get_value());
-        func->set_default_args(args);
+        auto tpl_def_args = def_args->as<tuple>();
+        func->set_default_args(tpl_def_args->get_value());
       }
 
       push_data(func);
       break;
     }
 
-    case bytecode::LOAD_CLOSURE: {
+    case LOAD_CLOSURE: {
       auto v = cur_frame->get_closure()->at(op_arg);
       if (!v) {
         v = cur_frame->get_cell_from_parameter(op_arg);
-        cur_frame->get_closure()->set(op_arg, v);
+        cur_frame->get_closure()->set_at(op_arg, v);
       }
       if (v->get_klass() == cell_klass::get_instance()) {
         push_data(v);
       } else {
-        push_data(std::make_shared<cell>(cur_frame->get_closure(), op_arg));
+        push_data(new cell{cur_frame->get_closure(), op_arg});
       }
       break;
     }
 
-    case bytecode::LOAD_DEREF: {
+    case LOAD_DEREF: {
       auto v = cur_frame->get_closure()->at(op_arg);
       if (v->get_klass() == cell_klass::get_instance()) {
-        v = (std::static_pointer_cast<cell>(v))->value();
+        v = v->as<cell>()->value();
       }
       push_data(v);
       break;
     }
 
-    case bytecode::STORE_DEREF:
-      cur_frame->get_closure()->set(op_arg, pop_data());
+    case STORE_DEREF:
+      cur_frame->get_closure()->set_at(op_arg, pop_data());
       break;
 
-    case bytecode::CALL_FUNCTION_KW: {
-      auto args = std::make_shared<std::vector<std::shared_ptr<object>>>();
+    case CALL_FUNCTION_KW: {
+      auto args = new vector<object *>{};
       if (op_arg > 0) {
         auto tpl = pop_data();
-        assert(tpl && tpl->get_klass() == tuple_klass::get_instance());
-        auto tpl_obj = std::static_pointer_cast<tuple>(tpl);
+        auto tpl_obj = tpl->as<tuple>();
         const int kw_size = static_cast<int>(tpl_obj->size());
         int i{kw_size};
-        auto kwargs = std::make_shared<dict>();
+        auto kwargs = new dict{};
         while (i--) {
           kwargs->insert(tpl_obj->at(i), pop_data());
         }
 
         i = op_arg - static_cast<int>(kw_size);
         if (i > 0) {
-          args->resize(i);
           while (i--) {
-            args->at(i) = pop_data();
+            args->set(i, pop_data());
           }
         }
 
@@ -531,12 +512,11 @@ void interpreter::eval_frame() {
       break;
     }
 
-    case bytecode::BUILD_CONST_KEY_MAP: {
+    case BUILD_CONST_KEY_MAP: {
       auto keys = pop_data();
-      assert(keys && keys->get_klass() == tuple_klass::get_instance());
-      auto tpl_obj = std::static_pointer_cast<tuple>(keys);
-      int dict_size = static_cast<int>(tpl_obj->get_value().size());
-      auto dict_obj = std::make_shared<dict>();
+      auto tpl_obj = keys->as<tuple>();
+      int dict_size = static_cast<int>(tpl_obj->size());
+      auto dict_obj = new dict{};
       while (dict_size--) {
         auto v = pop_data();
         dict_obj->insert(tpl_obj->at(dict_size), v);
@@ -545,21 +525,20 @@ void interpreter::eval_frame() {
       break;
     }
 
-    case bytecode::LOAD_METHOD: {
+    case LOAD_METHOD: {
       auto v = pop_data();
       auto w = cur_frame->get_names()->at(op_arg); // owner
       push_data(v->getattr(w));
       break;
     }
 
-    case bytecode::CALL_METHOD: {
-      std::shared_ptr<std::vector<std::shared_ptr<object>>> args;
+    case CALL_METHOD: {
+      vector<object *> *args{nullptr};
       if (op_arg > 0) {
-        args = std::make_shared<std::vector<std::shared_ptr<object>>>();
-        args->resize(op_arg);
+        args = new vector<object *>{};
         int i{op_arg};
         while (i--) {
-          args->at(i) = pop_data();
+          args->set(i, pop_data());
         }
       }
       auto func = pop_data();
@@ -568,17 +547,15 @@ void interpreter::eval_frame() {
       break;
     }
 
-    case bytecode::LIST_EXTEND: {
+    case LIST_EXTEND: {
       auto tpl = pop_data();
-      assert(tpl && tpl->get_klass() == tuple_klass::get_instance());
-      auto tpl_obj = std::static_pointer_cast<tuple>(tpl);
+      auto tpl_obj = tpl->as<tuple>();
 
       auto lst = pop_data();
-      assert(lst && lst->get_klass() == list_klass::get_instance());
-      auto lst_obj = std::static_pointer_cast<list>(lst);
+      auto lst_obj = lst->as<list>();
 
-      for (const auto e : tpl_obj->get_value()) {
-        lst_obj->append(e);
+      for (size_t i{0}; i < tpl_obj->size(); i++) {
+        lst_obj->append(tpl_obj->at(i));
       }
       push_data(lst);
       break;
@@ -590,18 +567,15 @@ void interpreter::eval_frame() {
   }
 }
 
-void interpreter::build_frame(
-    std::shared_ptr<object> callable,
-    std::shared_ptr<std::vector<std::shared_ptr<object>>> args,
-    int real_arg_cnt, bool has_kw_arg) {
-  if (callable->get_klass() == native_function_klass::get_instance()) {
-    auto native_func = std::static_pointer_cast<function>(callable);
+void interpreter::build_frame(object *callable, vector<object *> *args,
+                              int real_arg_cnt, bool has_kw_arg) {
+  if (callable->is<native_function>()) {
+    auto native_func = callable->as<native_function>();
     // prepare other data
-    if (native_func->get_native_func() == cppython::build_class) {
+    if (native_func->is_build_class()) {
       auto arg_0 = args->at(0); // func_code
-      assert(arg_0 && arg_0->get_klass() == function_klass::get_instance());
-      auto func_obj = std::static_pointer_cast<function>(arg_0);
-      auto new_frame = std::make_shared<frame>(func_obj, nullptr);
+      auto func_obj = arg_0->as<function>();
+      auto new_frame = new frame{func_obj, nullptr};
       new_frame->set_entry_frame(true);
       enter_frame(new_frame);
       eval_frame();
@@ -610,21 +584,19 @@ void interpreter::build_frame(
       args->push_back(locals_dict);
     }
     push_data(native_func->call(args));
-
   } else if (callable->get_klass() == method_klass::get_instance()) {
-    auto method_obj = std::static_pointer_cast<method>(callable);
+    auto method_obj = callable->as<method>();
     if (!args) {
-      args = std::make_shared<std::vector<std::shared_ptr<object>>>();
+      args = new vector<object *>{};
     }
-    args->insert(args->begin(), method_obj->get_owner());
+    args->insert(0, method_obj->get_owner());
     build_frame(method_obj->get_func(), args, real_arg_cnt + 1, has_kw_arg);
   } else if (callable->get_klass() == function_klass::get_instance()) {
-    auto func = std::static_pointer_cast<function>(callable);
-    auto new_frame =
-        std::make_shared<frame>(func, args, real_arg_cnt, has_kw_arg);
+    auto func = callable->as<function>();
+    auto new_frame = new frame{func, args, real_arg_cnt, has_kw_arg};
     enter_frame(new_frame);
   } else if (callable->get_klass() == type_klass::get_instance()) {
-    auto obj_type = std::static_pointer_cast<type>(callable);
+    auto obj_type = callable->as<type>();
     auto obj = obj_type->get_own_klass()->allocate_instance(callable, args);
     push_data(obj);
   } else {
@@ -638,35 +610,34 @@ void interpreter::build_frame(
   }
 }
 
-void interpreter::enter_frame(std::shared_ptr<frame> new_frame) {
+void interpreter::enter_frame(frame *new_frame) {
   new_frame->set_caller(cur_frame);
   cur_frame = new_frame;
 }
 
-void interpreter::destroy_frame() { cur_frame = cur_frame->get_caller(); }
+void interpreter::destroy_frame() {
+  delete std::exchange(cur_frame, cur_frame->get_caller());
+}
 
 void interpreter::leave_frame() {
   destroy_frame();
   push_data(ret_value);
 }
 
-std::shared_ptr<object> interpreter::call_virtual(
-    std::shared_ptr<object> func,
-    std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
-  if (func->get_klass() == native_function_klass::get_instance()) {
+object *interpreter::call_virtual(object *func, vector<object *> *args) {
+  if (func->is<native_function>()) {
     // we do not create a virtual frame, but native frame.
-    return std::static_pointer_cast<function>(func)->call(args);
+    return func->as<native_function>()->call(args);
   } else if (func->get_klass() == method_klass::get_instance()) {
-    auto method_obj = std::static_pointer_cast<method>(func);
+    auto method_obj = func->as<method>();
     if (!args) {
-      args = std::make_shared<std::vector<std::shared_ptr<object>>>();
+      args = new vector<object *>{};
     }
-    args->insert(args->begin(), method_obj->get_owner());
+    args->insert(0, method_obj->get_owner());
     return call_virtual(method_obj->get_func(), args);
   } else if (method::is_function(func)) {
-    auto func_obj = std::static_pointer_cast<function>(func);
-    auto new_frame =
-        std::make_shared<frame>(func_obj, args, static_cast<int>(args->size()));
+    auto func_obj = func->as<function>();
+    auto new_frame = new frame{func_obj, args, static_cast<int>(args->size())};
     new_frame->set_entry_frame(true);
     enter_frame(new_frame);
     eval_frame();
@@ -674,4 +645,13 @@ std::shared_ptr<object> interpreter::call_virtual(
     return ret_value;
   }
   return static_value::none_value;
+}
+
+void interpreter::oops_do(oop_closure *f) {
+  f->do_oop(reinterpret_cast<object *&>(builtins));
+  f->do_oop(reinterpret_cast<object *&>(ret_value));
+
+  if (cur_frame) {
+    cur_frame->oops_do(f);
+  }
 }

@@ -4,40 +4,38 @@
 #include "object/string.hpp"
 #include "object/tuple.hpp"
 #include "runtime/static_value.hpp"
+#include "utils/vector.hpp"
 
 #include <algorithm>
 #include <cassert>
 #include <chrono>
-#include <print>
+#include <string>
 
 using namespace cppython;
 
 constexpr int flag_ref = 0x80;
 
-std::shared_ptr<code_object> pyc_parser::parse() {
-  auto magic_number = reader.read<int>();
-  // std::println("magic number is {:#x}", magic_number);
+code_object *pyc_parser::parse() {
+  const auto magic_number = reader.read<int>();
 
-  auto bit_field = reader.read<int>();
-  // std::println("bit field is {}", bit_field);
+  const auto bit_field = reader.read<int>();
 
-  time_t mod_date = reader.read<int>();
-  auto time = std::chrono::system_clock::from_time_t(mod_date);
+  const time_t mod_date = reader.read<int>();
+  const auto time = std::chrono::system_clock::from_time_t(mod_date);
   const std::chrono::zoned_time cur_time{std::chrono::current_zone(), time};
-  // std::println("last modified date is {}", cur_time);
 
-  auto file_size = reader.read<int>();
-  // std::println("file size is {} byte", file_size);
+  const auto file_size = reader.read<int>();
 
   auto r = parse_object();
-  assert(r->get_klass() == code_klass::get_instance());
-  return std::static_pointer_cast<code_object>(r);
+
+  return r->as<code_object>();
 }
 
-std::shared_ptr<object> pyc_parser::parse_object() {
+object *pyc_parser::parse_object() {
   int object_type = reader.read<unsigned char>();
-  bool ref_flag = object_type & flag_ref;
+  const bool ref_flag = object_type & flag_ref;
   object_type = object_type & ~flag_ref;
+
   switch (object_type) {
   case 'N': // None
     return static_value::none_value;
@@ -53,11 +51,7 @@ std::shared_ptr<object> pyc_parser::parse_object() {
     break;
   case 'r':
   case 'R': // ref integer
-    if (auto idx = reader.read<int>(); idx < ref_table.size()) {
-      return ref_table.at(idx);
-    } else {
-      return static_value::none_value;
-    }
+    return ref_table.at(reader.read<int>());
     break;
   case 's': // string
   case 't': // ref string
@@ -66,7 +60,6 @@ std::shared_ptr<object> pyc_parser::parse_object() {
   case 'c': // code
     return get_code_object(ref_flag);
     break;
-
   case '(': // tuple
   case ')': // small tuple
     return get_tuple(ref_flag);
@@ -79,148 +72,117 @@ std::shared_ptr<object> pyc_parser::parse_object() {
     assert(false);
     break;
   }
-  return std::shared_ptr<object>();
+  return nullptr;
 }
 
-std::shared_ptr<code_object> pyc_parser::get_code_object(bool ref_flag) {
+code_object *pyc_parser::get_code_object(bool ref_flag) {
   size_t pos = -1;
   if (ref_flag) {
-    ref_table.push_back(static_value::none_value);
+    ref_table.push_back(nullptr);
     pos = ref_table.size() - 1;
   }
 
   int argcount = reader.read<int>();
-  // std::println("argcount {}", argcount);
 
   int posonlyargcount = reader.read<int>();
-  // std::println("posonlyargcount {}", posonlyargcount);
 
   int kwonlyargcount = reader.read<int>();
-  // std::println("kwonlyargcount {}", kwonlyargcount);
 
   int nlocals = reader.read<int>();
-  // std::println("nlocals {}", nlocals);
 
   int stacksize = reader.read<int>();
-  // std::println("stacksize {}", stacksize);
 
   int flags = reader.read<int>();
-  // std::println("flags {:04x}", flags);
 
   auto code = parse_byte_codes();
-  // std::print("code ");
-  // for (const auto ch : code->to_string()) {
-  //   std::print("{:02x}", static_cast<unsigned char>(ch));
-  // }
-  // std::print("\n");
 
-  auto consts = parse_consts();
-  // std::println("consts {}", consts->to_string());
+  auto consts = parse_tuple();
 
-  auto names = parse_names();
-  // std::println("names {}", names->to_string());
+  auto names = parse_tuple();
 
   auto varnames = parse_object();
-  // std::println("varnames {}", varnames->to_string());
 
   auto freevars = parse_object();
-  // std::println("freevars {}", freevars->to_string());
 
   auto cellvars = parse_object();
-  // std::println("cellvars {}", cellvars->to_string());
 
   auto filename = parse_object();
-  // std::println("filename {}", filename->to_string());
 
   auto name = parse_object();
-  // std::println("name {}", name->to_string());
 
   int firstlineno = reader.read<int>();
-  // std::println("line_no {}", firstlineno);
 
   auto lnotab = parse_object();
-  // for (const auto ch : lnotab->to_string()) {
-  //   std::print("{:02x}", static_cast<unsigned char>(ch));
-  // }
-  // std::print("\n");
 
-  auto tmp = std::make_shared<code_object>(
-      argcount, posonlyargcount, kwonlyargcount, nlocals, stacksize, flags,
-      std::move(code), std::move(consts), std::move(names), std::move(varnames),
-      std::move(freevars), std::move(cellvars), std::move(filename),
-      std::move(name), firstlineno, std::move(lnotab));
+  auto tmp = new code_object{argcount,       posonlyargcount,
+                             kwonlyargcount, nlocals,
+                             stacksize,      flags,
+                             code,           consts,
+                             names,          varnames,
+                             freevars,       cellvars,
+                             filename,       name,
+                             firstlineno,    lnotab};
   if (ref_flag) {
     ref_table.at(pos) = tmp;
   }
   return tmp;
 }
 
-std::shared_ptr<string> pyc_parser::parse_byte_codes() {
+string *pyc_parser::parse_byte_codes() {
   assert(reader.read<char>() == 's');
   return get_string(false);
 }
 
-std::shared_ptr<string> pyc_parser::get_string(bool ref_flag) {
+string *pyc_parser::get_string(bool ref_flag) {
   int length = reader.read<int>();
-  std::string str;
-  str.resize(length);
+  auto tmp = new string{static_cast<size_t>(length), '\0'};
 
-  std::generate_n(str.begin(), length,
-                  [this]() { return reader.read<char>(); });
+  std::generate_n(tmp->begin(), length, [this] { return reader.read<char>(); });
 
-  auto tmp = std::make_shared<string>(std::move(str));
   if (ref_flag) {
     ref_table.push_back(tmp);
   }
   return tmp;
 }
 
-std::shared_ptr<integer> pyc_parser::get_integer(bool ref_flag) {
-  auto tmp = std::make_shared<integer>(reader.read<int>());
+integer *pyc_parser::get_integer(bool ref_flag) {
+  auto tmp = new integer{reader.read<int>()};
   if (ref_flag) {
     ref_table.push_back(tmp);
   }
   return tmp;
 }
 
-std::shared_ptr<string> pyc_parser::get_short_ascii(bool ref_flag) {
+string *pyc_parser::get_short_ascii(bool ref_flag) {
   auto length = reader.read<unsigned char>();
-  std::string str;
-  str.resize(length);
+  auto tmp = new string{static_cast<size_t>(length), '\0'};
 
-  std::generate_n(str.begin(), length,
-                  [this]() { return reader.read<char>(); });
+  std::generate_n(tmp->begin(), length, [this] { return reader.read<char>(); });
 
-  auto tmp = std::make_shared<string>(std::move(str));
   if (ref_flag) {
     ref_table.push_back(tmp);
   }
-
   return tmp;
 }
 
-std::shared_ptr<tuple> pyc_parser::parse_consts() { return parse_tuple(); }
-
-std::shared_ptr<tuple> pyc_parser::parse_names() { return parse_tuple(); }
-
-std::shared_ptr<tuple> pyc_parser::parse_tuple() {
+tuple *pyc_parser::parse_tuple() {
   auto r = parse_object();
-  assert(r->get_klass() == tuple_klass::get_instance());
-  return std::static_pointer_cast<tuple>(r);
+  return r->as<tuple>();
 }
 
-std::shared_ptr<tuple> pyc_parser::get_tuple(bool ref_flag) {
+tuple *pyc_parser::get_tuple(bool ref_flag) {
   size_t pos = -1;
   if (ref_flag) {
-    ref_table.push_back(static_value::none_value);
+    ref_table.push_back(nullptr);
     pos = ref_table.size() - 1;
   }
   int length = reader.read<char>();
-  std::vector<std::shared_ptr<object>> list;
+  auto lst = new vector<object *>{};
+
   for (int i{0}; i < length; i++) {
-    list.push_back(parse_object());
+    lst->push_back(parse_object());
   }
-  auto tmp = std::make_shared<tuple>(std::move(list));
+  auto tmp = new tuple{lst};
   if (ref_flag) {
     ref_table.at(pos) = tmp;
   }

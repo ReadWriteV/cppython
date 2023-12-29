@@ -7,15 +7,15 @@
 using namespace cppython;
 
 cell_klass::cell_klass() {
-  set_dict(std::make_shared<dict>());
+  set_dict(new dict{});
   set_name("cell");
 }
 
-cell::cell(std::shared_ptr<list> t, int i) : table{t}, index{i} {
+cell::cell(list *t, int i) : table{t}, index{i} {
   set_klass(cell_klass::get_instance());
 }
 
-// void CellKlass::oops_do(OopClosure *closure, HiObject *obj) {
+// void CellKlass::oops_do(oop_closure *closure, object *obj) {
 //   CellObject *co = (CellObject *)obj;
-//   closure->do_oop((HiObject **)&co->_table);
+//   closure->do_oop((object **)&co->_table);
 // }

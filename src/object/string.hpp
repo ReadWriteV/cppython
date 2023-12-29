@@ -4,46 +4,55 @@
 #include "object/object.hpp"
 #include "utils/singleton.hpp"
 
-#include <memory>
 #include <string>
+#include <string_view>
 
 namespace cppython {
+
+class oop_closure;
+
+template <typename T>
+class vector;
+
 class string_klass : public klass, public singleton<string_klass> {
 public:
   void initialize();
 
-  std::string to_string(std::shared_ptr<object> obj) override;
+  std::string to_string(object *obj) override;
 
-  std::shared_ptr<object> equal(std::shared_ptr<object> x,
-                                std::shared_ptr<object> y) override;
-  std::shared_ptr<object> less(std::shared_ptr<object> x,
-                               std::shared_ptr<object> y) override;
+  object *equal(object *x, object *y) override;
+  object *less(object *x, object *y) override;
 
-  std::shared_ptr<object> subscr(std::shared_ptr<object> x,
-                                 std::shared_ptr<object> y) override;
-  std::shared_ptr<object> len(std::shared_ptr<object> x) override;
-  std::shared_ptr<object> allocate_instance(
-      std::shared_ptr<object> obj_type,
-      std::shared_ptr<std::vector<std::shared_ptr<object>>> args) override;
+  object *subscr(object *x, object *y) override;
+  object *len(object *x) override;
+  object *allocate_instance(object *obj_type, vector<object *> *args) override;
+
+  void oops_do(oop_closure *closure, object *obj) override;
+  size_t size() const override;
 };
 
 class string : public object {
 public:
-  template <typename... Args>
-  string(Args &&...args) : value(std::forward<Args>(args)...) {
-    set_klass(string_klass::get_instance());
-  }
+  using klass_type = string_klass;
 
-  auto size() const { return value.size(); }
-  auto at(size_t pos) const { return value.at(pos); }
+public:
+  string(std::string_view sv);
+  string(const std::size_t cnt, const char ch);
 
-  const std::string &get_value() const { return value; }
+  [[nodiscard]] std::size_t size() const { return length; }
+  [[nodiscard]] char at(const std::size_t pos) const { return data_ptr[pos]; }
 
-  static std::shared_ptr<object>
-  string_upper(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
+  [[nodiscard]] char *begin() const { return data_ptr; }
+  [[nodiscard]] char *end() const { return data_ptr + length; }
+
+  [[nodiscard]] char *data() const { return data_ptr; }
+  char *&data_address() { return data_ptr; };
+
+  static object *string_upper(vector<object *> *args);
 
 private:
-  std::string value;
+  char *data_ptr;
+  std::size_t length;
 };
 
 } // namespace cppython

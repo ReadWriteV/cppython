@@ -1,4 +1,5 @@
 #include "object/klass.hpp"
+#include "memory/oop_closure.hpp"
 #include "object/dict.hpp"
 #include "object/integer.hpp"
 #include "object/list.hpp"
@@ -13,23 +14,20 @@
 
 using namespace cppython;
 
+klass::klass() { static_value::klasses->push_back(this); }
+
 void klass::add_super(klass *x) {
   if (super == nullptr) {
-    super = std::make_shared<list>();
+    super = new list{};
   }
   super->append(x->get_type_object());
 }
 
-std::shared_ptr<type> klass::get_super() {
-  if (super == nullptr) {
+type *klass::get_super() {
+  if (super == nullptr || super->empty()) {
     return nullptr;
   }
-
-  if (super->empty()) {
-    return nullptr;
-  }
-
-  return std::static_pointer_cast<type>(super->at(0));
+  return super->at(0)->as<type>();
 }
 
 void klass::order_supers() {
@@ -38,28 +36,32 @@ void klass::order_supers() {
   }
 
   if (mro == nullptr) {
-    mro = std::make_shared<list>();
+    mro = new list{};
   }
 
   int cur = -1;
-  for (const auto &e : super->get_value()) {
-    auto type_obj = std::static_pointer_cast<type>(e);
+  auto &&super_lst = super->get_value();
+  for (size_t i{0}; i < super_lst->size(); i++) {
+    auto type_obj = super_lst->at(i)->as<type>();
     auto k = type_obj->get_own_klass();
     mro->append(type_obj);
     if (k->get_mro() == nullptr) {
       continue;
     }
 
-    for (const auto &ele : k->get_mro()->get_value()) {
-      auto type_obj = std::static_pointer_cast<type>(ele);
-      int index = mro->find(type_obj, std::equal_to{});
-      if (index < cur) {
+    auto &&mro_lst = k->get_mro()->get_value();
+    for (size_t j{0}; j < mro_lst->size(); j++) {
+      auto type_obj = mro_lst->at(j)->as<type>();
+      auto index = mro->find(type_obj, std::equal_to{});
+      auto idx = index.transform([](size_t i) { return static_cast<int>(i); })
+                     .value_or(-1);
+      if (idx < cur) {
         std::println("Error: method resolution order conflicts.");
         assert(false);
       }
-      cur = index;
-      if (index >= 0) {
-        mro->get_value().erase(mro->begin() + index);
+      cur = idx;
+      if (idx >= 0) {
+        mro_lst->erase(idx);
       }
       mro->append(type_obj);
     }
@@ -70,16 +72,18 @@ void klass::order_supers() {
   }
 
   // std::print("{}'s mro is ", name);
-  // for (const auto &e : mro->get_value()) {
-  //   auto type_obj = std::static_pointer_cast<type>(e);
+  // auto &&mro_lst = mro->get_value();
+  // for (size_t i{0}; i < mro_lst->size(); i++) {
+  //   auto type_obj = mro_lst->at(i)->as<type>();
   //   auto k = type_obj->get_own_klass();
   //   std::print("{}, ", k->get_name());
   // }
   // std::print("\n");
 }
 
-std::weak_ordering klass::compare(klass *x, klass *y) {
+void cppython::klass::set_name(std::string_view x) { name = new string{x}; }
 
+std::weak_ordering klass::compare(klass *x, klass *y) {
   if (x == y) {
     return std::weak_ordering::equivalent;
   }
@@ -93,41 +97,35 @@ std::weak_ordering klass::compare(klass *x, klass *y) {
   return x->get_name() <=> y->get_name();
 }
 
-std::string klass::to_string(std::shared_ptr<object> obj) {
+std::string klass::to_string(object *obj) {
   return std::format("<{} object at {:p}>",
                      obj->get_klass()->get_type_object()->get_type_name(),
-                     static_cast<void *>(obj.get()));
+                     static_cast<void *>(obj));
 }
 
-std::shared_ptr<object> klass::add(std::shared_ptr<object> x,
-                                   std::shared_ptr<object> y) {
-  auto args = std::make_shared<std::vector<std::shared_ptr<object>>>();
+object *klass::add(object *x, object *y) {
+  auto args = new vector<object *>{};
   args->push_back(y);
   return find_and_call(x, args, string_table::get_instance()->add_str);
 }
 
-std::shared_ptr<object> klass::subscr(std::shared_ptr<object> x,
-                                      std::shared_ptr<object> y) {
-  auto args = std::make_shared<std::vector<std::shared_ptr<object>>>();
+object *klass::subscr(object *x, object *y) {
+  auto args = new vector<object *>{};
   args->push_back(y);
   return find_and_call(x, args, string_table::get_instance()->getitem_str);
 }
-void klass::store_subscr(std::shared_ptr<object> x, std::shared_ptr<object> y,
-                         std::shared_ptr<object> z) {
-  auto args = std::make_shared<std::vector<std::shared_ptr<object>>>();
+void klass::store_subscr(object *x, object *y, object *z) {
+  auto args = new vector<object *>{};
   args->push_back(y);
   args->push_back(z);
   find_and_call(x, args, string_table::get_instance()->setitem_str);
 }
 
-std::shared_ptr<object> klass::getattr(std::shared_ptr<object> x,
-                                       std::shared_ptr<object> y) {
-
+object *klass::getattr(object *x, object *y) {
   auto func = find_in_parents(x, string_table::get_instance()->getattr_str);
-  if (func->get_klass() == function_klass::get_instance()) {
-    func =
-        std::make_shared<method>(std::static_pointer_cast<function>(func), x);
-    auto args = std::make_shared<std::vector<std::shared_ptr<object>>>();
+  if (func->is<function>()) {
+    func = new method{func->as<function>(), x};
+    auto args = new vector<object *>{};
     args->push_back(y);
     return interpreter::get_instance()->call_virtual(func, args);
   }
@@ -142,64 +140,59 @@ std::shared_ptr<object> klass::getattr(std::shared_ptr<object> x,
   auto result = find_in_parents(x, y);
 
   if (method::is_function(result)) {
-    result =
-        std::make_shared<method>(std::static_pointer_cast<function>(result), x);
+    result = new method{static_cast<function *>(result), x};
   }
   return result;
 }
 
-std::shared_ptr<object> klass::setattr(std::shared_ptr<object> x,
-                                       std::shared_ptr<object> y,
-                                       std::shared_ptr<object> z) {
+object *klass::setattr(object *x, object *y, object *z) {
   auto func =
       x->get_klass()->get_dict()->at(string_table::get_instance()->setattr_str);
-  if (func->get_klass() == function_klass::get_instance()) {
-    func =
-        std::make_shared<method>(std::static_pointer_cast<function>(func), x);
-    auto args = std::make_shared<std::vector<std::shared_ptr<object>>>();
+  if (func->is<function>()) {
+    func = new method{func->as<function>(), x};
+    auto args = new vector<object *>{};
     args->push_back(y);
     args->push_back(z);
     return interpreter::get_instance()->call_virtual(func, args);
   }
 
-  if (x->get_klass() == type_klass::get_instance()) {
-    auto type_obj = std::static_pointer_cast<type>(x);
+  if (x->is<type>()) {
+    auto type_obj = x->as<type>();
     type_obj->get_own_klass()->get_dict()->insert(y, z);
     return static_value::none_value;
   }
 
   if (!x->get_obj_dict()) {
-    x->set_obj_dict(std::make_shared<dict>());
+    x->set_obj_dict(new dict{});
   }
 
   x->get_obj_dict()->insert(y, z);
   return static_value::none_value;
 }
 
-std::shared_ptr<object> klass::len(std::shared_ptr<object> x) {
+object *klass::len(object *x) {
   return find_and_call(x, nullptr, string_table::get_instance()->len_str);
 }
 
-std::shared_ptr<object> klass::allocate_instance(
-    std::shared_ptr<object> obj_type,
-    std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
-  std::shared_ptr<object> inst;
-  if (mro->has_pointer(integer_klass::get_instance()->get_type_object())) {
-    inst = std::make_shared<integer>(0);
-  } else if (mro->has_pointer(
-                 string_klass::get_instance()->get_type_object())) {
-    inst = std::make_shared<string>("");
-  } else if (mro->has_pointer(list_klass::get_instance()->get_type_object())) {
-    inst = std::make_shared<list>();
-  } else if (mro->has_pointer(dict_klass::get_instance()->get_type_object())) {
-    inst = std::make_shared<dict>();
+object *klass::allocate_instance(object *obj_type, vector<object *> *args) {
+  object *inst;
+  if (mro->find(integer_klass::get_instance()->get_type_object(),
+                std::equal_to{})) {
+    inst = new integer{0};
+  } else if (mro->find(string_klass::get_instance()->get_type_object(),
+                       std::equal_to{})) {
+    inst = new string{""};
+  } else if (mro->find(list_klass::get_instance()->get_type_object(),
+                       std::equal_to{})) {
+    inst = new list{};
+  } else if (mro->find(dict_klass::get_instance()->get_type_object(),
+                       std::equal_to{})) {
+    inst = new dict{};
   } else {
-    inst = std::make_shared<object>();
+    inst = new object{};
   }
 
-  assert(obj_type && obj_type->get_klass() == type_klass::get_instance());
-  auto type_obj = std::static_pointer_cast<type>(obj_type);
-
+  auto type_obj = obj_type->as<type>();
   inst->set_klass(type_obj->get_own_klass());
 
   auto constructor = inst->getattr(string_table::get_instance()->init_str);
@@ -209,23 +202,38 @@ std::shared_ptr<object> klass::allocate_instance(
   return inst;
 }
 
-std::shared_ptr<object>
-klass::find_and_call(std::shared_ptr<object> x,
-                     std::shared_ptr<std::vector<std::shared_ptr<object>>> args,
-                     std::shared_ptr<string> func_name) {
+void *klass::operator new(size_t size) {
+  return static_value::allocate_meta(size);
+}
+
+void klass::oops_do(oop_closure *closure, object *obj) {
+  std::println("warning: klass oops_do for {}", name->to_string());
+}
+
+void klass::oops_do(oop_closure *closure) {
+  closure->do_oop(reinterpret_cast<object *&>(super));
+  closure->do_oop(reinterpret_cast<object *&>(mro));
+  closure->do_oop(reinterpret_cast<object *&>(name));
+  closure->do_oop(reinterpret_cast<object *&>(map));
+  closure->do_oop(reinterpret_cast<object *&>(type_object));
+}
+
+size_t klass::size() const { return sizeof(object); }
+
+object *klass::find_and_call(object *x, vector<object *> *args,
+                             string *func_name) {
   auto func = x->getattr(func_name);
   if (func != static_value::none_value) {
     return interpreter::get_instance()->call_virtual(func, args);
   }
 
   std::println("class {} Error : unsupport operation for class",
-               x->get_klass()->get_name());
+               x->get_klass()->get_name()->to_string());
   assert(false);
   return static_value::none_value;
 }
 
-std::shared_ptr<object> klass::find_in_parents(std::shared_ptr<object> x,
-                                               std::shared_ptr<object> y) {
+object *klass::find_in_parents(object *x, object *y) {
 
   auto result = x->get_klass()->get_dict()->at(y);
   if (result != static_value::none_value) {
@@ -237,8 +245,9 @@ std::shared_ptr<object> klass::find_in_parents(std::shared_ptr<object> x,
     return result;
   }
 
-  for (const auto &e : x->get_klass()->get_mro()->get_value()) {
-    auto type_obj = std::static_pointer_cast<type>(e);
+  auto &&mro_lst = x->get_klass()->get_mro()->get_value();
+  for (size_t i{0}; i < mro_lst->size(); i++) {
+    auto type_obj = mro_lst->at(i)->as<type>();
     result = type_obj->get_own_klass()->get_dict()->at(y);
     if (result != static_value::none_value)
       break;

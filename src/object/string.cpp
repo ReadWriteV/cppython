@@ -1,118 +1,123 @@
 #include "object/string.hpp"
+#include "memory/oop_closure.hpp"
 #include "object/dict.hpp"
 #include "object/integer.hpp"
 #include "runtime/function.hpp"
 #include "runtime/static_value.hpp"
+#include "utils/vector.hpp"
 
 #include <algorithm>
-#include <cassert>
-#include <print>
 
 using namespace cppython;
 
 void string_klass::initialize() {
 
-  auto string_dict = std::make_shared<dict>();
+  auto string_dict = new dict{};
 
-  string_dict->insert(std::make_shared<string>("upper"),
-                      std::make_shared<function>(string::string_upper));
+  string_dict->insert(new string{"upper"},
+                      new native_function{string::string_upper});
 
   set_dict(string_dict);
 
   set_name("str");
-  std::make_shared<type>()->set_own_klass(this);
+  (new type{})->set_own_klass(this);
   add_super(object_klass::get_instance());
 }
 
-std::string string_klass::to_string(std::shared_ptr<object> obj) {
-
-  auto p = std::static_pointer_cast<string>(obj);
-
-  assert(p && (p->get_klass() == this));
-
-  return p->get_value();
+std::string string_klass::to_string(object *obj) {
+  auto p = obj->as<string>();
+  return std::string{p->data(), p->size()};
 }
 
-std::shared_ptr<object> string_klass::equal(std::shared_ptr<object> x,
-                                            std::shared_ptr<object> y) {
+object *string_klass::equal(object *x, object *y) {
   if (x->get_klass() != y->get_klass()) {
     return static_value::false_value;
   }
 
-  auto p = std::static_pointer_cast<string>(x);
-  auto q = std::static_pointer_cast<string>(y);
+  auto p = x->as<string>();
+  auto q = y->as<string>();
 
-  assert(p && (p->get_klass() == this));
-  assert(q && (q->get_klass() == this));
+  if (p->size() != q->size()) {
+    return static_value::false_value;
+  }
 
-  auto r = p->get_value() <=> q->get_value();
-  return static_value::get_bool_value(std::is_eq(r));
+  auto r = std::ranges::equal(*p, *q);
+  return static_value::get_bool_value(r);
 }
 
-std::shared_ptr<object> string_klass::less(std::shared_ptr<object> x,
-                                           std::shared_ptr<object> y) {
-  auto p = std::static_pointer_cast<string>(x);
-  assert(p && (p->get_klass() == this));
+object *string_klass::less(object *x, object *y) {
+  auto p = x->as<string>();
 
   // check y is string or not
-  if (y->get_klass() != this) {
+  if (!y->is<string>()) {
     return static_value::get_bool_value(
         std::is_lt(klass::compare(x->get_klass(), y->get_klass())));
   }
 
-  auto q = std::static_pointer_cast<string>(y);
-  assert(q && (q->get_klass() == this));
+  auto q = y->as<string>();
 
-  auto r = p->get_value() <=> q->get_value();
-  return static_value::get_bool_value(std::is_lt(r));
+  auto r = std::ranges::lexicographical_compare(*p, *q);
+
+  return static_value::get_bool_value(r);
 }
 
-std::shared_ptr<object> string_klass::subscr(std::shared_ptr<object> x,
-                                             std::shared_ptr<object> y) {
-  assert(x->get_klass() == this);
-  assert(y->get_klass() == integer_klass::get_instance());
+object *string_klass::subscr(object *x, object *y) {
+  auto str_obj = x->as<string>();
+  auto int_obj = y->as<integer>();
 
-  auto string_obj = std::static_pointer_cast<string>(x);
-  auto index_obj = std::static_pointer_cast<integer>(y);
+  auto ch = str_obj->at(int_obj->get_value());
 
-  auto ch = string_obj->at(index_obj->get_value());
-
-  return std::make_shared<string>(1, ch);
+  return new string{1, ch};
 }
 
-std::shared_ptr<object> string_klass::len(std::shared_ptr<object> x) {
-  assert(x->get_klass() == this);
-  auto string_obj = std::static_pointer_cast<string>(x);
-  return std::make_shared<integer>(static_cast<int>(string_obj->size()));
+object *string_klass::len(object *x) {
+  auto str_obj = x->as<string>();
+  return new integer{static_cast<int>(str_obj->size())};
 }
 
-std::shared_ptr<object> string_klass::allocate_instance(
-    std::shared_ptr<object> obj_type,
-    std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
-  if (!args || args->size() == 0) {
-    return std::make_shared<string>("");
+object *string_klass::allocate_instance(object *obj_type,
+                                        vector<object *> *args) {
+  if (args == nullptr || args->size() == 0) {
+    return new string{""};
   } else {
     return nullptr;
   }
 }
 
-std::shared_ptr<object> string::string_upper(
-    std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
-  auto arg_0 = args->at(0);
-  assert(arg_0->get_klass() == string_klass::get_instance());
+void string_klass::oops_do(oop_closure *closure, object *obj) {
+  auto str_obj = obj->as<string>();
+  closure->do_raw_mem(str_obj->data_address(), str_obj->size());
+}
 
-  auto str_obj = std::static_pointer_cast<string>(arg_0);
+size_t string_klass::size() const { return sizeof(string); }
+
+string::string(std::string_view sv) {
+  length = sv.size();
+  data_ptr = static_cast<char *>(static_value::allocate(length));
+  std::copy(sv.begin(), sv.end(), data_ptr);
+  set_klass(string_klass::get_instance());
+}
+
+string::string(const std::size_t cnt, const char ch) {
+  length = cnt;
+  data_ptr = static_cast<char *>(static_value::allocate(length));
+  std::fill_n(data_ptr, length, ch);
+  set_klass(string_klass::get_instance());
+}
+
+object *string::string_upper(vector<object *> *args) {
+  auto arg_0 = args->at(0);
+  auto str_obj = arg_0->as<string>();
 
   auto length = str_obj->size();
-  if (length <= 0) {
+  if (length == 0) {
     return static_value::none_value;
   }
 
-  std::string upper_str;
-  upper_str.resize(length);
+  auto upper_str = new string{length, '\0'};
 
-  std::transform(str_obj->get_value().begin(), str_obj->get_value().end(),
-                 upper_str.begin(), ::toupper);
+  std::transform(str_obj->begin(), str_obj->end(), upper_str->begin(),
+                 ::toupper);
 
-  return std::make_shared<string>(std::move(upper_str));
+  return upper_str;
 }

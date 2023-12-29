@@ -1,11 +1,7 @@
 #pragma once
 
 #include <compare>
-#include <memory>
-#include <string>
 #include <string_view>
-#include <unordered_map>
-#include <vector>
 
 namespace cppython {
 
@@ -14,127 +10,84 @@ class string;
 class dict;
 class type;
 class list;
+class oop_closure;
+
+template <typename T>
+class vector;
 
 // TODO: implement other overload functions
 class klass {
 public:
-  ~klass() = default;
+  klass();
 
   void add_super(klass *x);
-  std::shared_ptr<type> get_super();
+  type *get_super();
 
   void order_supers();
 
-  void set_super_list(const std::shared_ptr<list> &x) { super = x; }
+  void set_super_list(list *x) { super = x; }
   auto get_mro() { return mro; }
 
-  void set_type_object(const std::shared_ptr<type> &x) { type_object = x; }
-  std::shared_ptr<type> get_type_object() { return type_object; }
+  void set_type_object(type *x) { type_object = x; }
+  type *get_type_object() { return type_object; }
 
-  void set_name(std::string_view x) { name = x; }
-  std::string get_name() const { return name; }
+  void set_name(std::string_view x);
+  auto get_name() const { return name; }
 
-  void set_dict(std::shared_ptr<dict> x) { map = x; }
-  std::shared_ptr<dict> get_dict() { return map; }
+  void set_dict(dict *x) { map = x; }
+  dict *get_dict() { return map; }
 
   static std::weak_ordering compare(klass *x, klass *y);
 
-  virtual std::string to_string(std::shared_ptr<object> obj);
+  virtual std::string to_string(object *obj);
 
-  virtual std::shared_ptr<object> greater(std::shared_ptr<object> x,
-                                          std::shared_ptr<object> y) {
-    return nullptr;
-  }
-  virtual std::shared_ptr<object> less(std::shared_ptr<object> x,
-                                       std::shared_ptr<object> y) {
-    return nullptr;
-  }
-  virtual std::shared_ptr<object> equal(std::shared_ptr<object> x,
-                                        std::shared_ptr<object> y) {
-    return nullptr;
-  }
-  virtual std::shared_ptr<object> not_equal(std::shared_ptr<object> x,
-                                            std::shared_ptr<object> y) {
-    return nullptr;
-  }
-  virtual std::shared_ptr<object> ge(std::shared_ptr<object> x,
-                                     std::shared_ptr<object> y) {
-    return nullptr;
-  }
-  virtual std::shared_ptr<object> le(std::shared_ptr<object> x,
-                                     std::shared_ptr<object> y) {
-    return nullptr;
-  }
+  virtual object *greater(object *x, object *y) { return nullptr; }
+  virtual object *less(object *x, object *y) { return nullptr; }
+  virtual object *equal(object *x, object *y) { return nullptr; }
+  virtual object *not_equal(object *x, object *y) { return nullptr; }
+  virtual object *ge(object *x, object *y) { return nullptr; }
+  virtual object *le(object *x, object *y) { return nullptr; }
 
-  virtual std::shared_ptr<object> add(std::shared_ptr<object> x,
-                                      std::shared_ptr<object> y);
-  virtual std::shared_ptr<object> sub(std::shared_ptr<object> x,
-                                      std::shared_ptr<object> y) {
-    return nullptr;
-  }
-  virtual std::shared_ptr<object> mul(std::shared_ptr<object> x,
-                                      std::shared_ptr<object> y) {
-    return nullptr;
-  }
-  virtual std::shared_ptr<object> div(std::shared_ptr<object> x,
-                                      std::shared_ptr<object> y) {
-    return nullptr;
-  }
-  virtual std::shared_ptr<object> mod(std::shared_ptr<object> x,
-                                      std::shared_ptr<object> y) {
-    return nullptr;
-  }
-  virtual std::shared_ptr<object> subscr(std::shared_ptr<object> x,
-                                         std::shared_ptr<object> y);
-  virtual void store_subscr(std::shared_ptr<object> x,
-                            std::shared_ptr<object> y,
-                            std::shared_ptr<object> z);
-  virtual void del_subscr(std::shared_ptr<object> x,
-                          std::shared_ptr<object> y) {
-    return;
-  }
+  virtual object *add(object *x, object *y);
+  virtual object *sub(object *x, object *y) { return nullptr; }
+  virtual object *mul(object *x, object *y) { return nullptr; }
+  virtual object *div(object *x, object *y) { return nullptr; }
+  virtual object *mod(object *x, object *y) { return nullptr; }
+  virtual object *subscr(object *x, object *y);
+  virtual void store_subscr(object *x, object *y, object *z);
+  virtual void del_subscr(object *x, object *y) { return; }
 
-  virtual std::shared_ptr<object> getattr(std::shared_ptr<object> x,
-                                          std::shared_ptr<object> y);
-  virtual std::shared_ptr<object> setattr(std::shared_ptr<object> x,
-                                          std::shared_ptr<object> y,
-                                          std::shared_ptr<object> z);
+  virtual object *getattr(object *x, object *y);
+  virtual object *setattr(object *x, object *y, object *z);
 
-  virtual std::shared_ptr<object> contains(std::shared_ptr<object> x,
-                                           std::shared_ptr<object> y) {
-    return nullptr;
-  }
-  virtual std::shared_ptr<object> iter(std::shared_ptr<object> x) {
-    return nullptr;
-  }
-  virtual std::shared_ptr<object> next(std::shared_ptr<object> x) {
-    return nullptr;
-  }
-  virtual std::shared_ptr<object> len(std::shared_ptr<object> x);
-  virtual std::shared_ptr<object>
-  call(std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
-    return nullptr;
-  }
-  virtual std::shared_ptr<object>
-  allocate_instance(std::shared_ptr<object> obj_type,
-                    std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
+  virtual object *contains(object *x, object *y) { return nullptr; }
+  virtual object *iter(object *x) { return nullptr; }
+  virtual object *next(object *x) { return nullptr; }
+  virtual object *len(object *x);
+  virtual object *call(vector<object *> *args) { return nullptr; }
+  virtual object *allocate_instance(object *obj_type, vector<object *> *args);
+
+  void *operator new(size_t size);
+
+  // gc interfaces
+  // this is for objects of this type.
+  virtual void oops_do(oop_closure *closure, object *obj);
+  // for klass itself only.
+  virtual void oops_do(oop_closure *closure);
+  virtual size_t size() const;
 
 private:
-  std::shared_ptr<object>
-  find_and_call(std::shared_ptr<object> x,
-                std::shared_ptr<std::vector<std::shared_ptr<object>>> args,
-                std::shared_ptr<string> func_name);
-  std::shared_ptr<object> find_in_parents(std::shared_ptr<object> x,
-                                          std::shared_ptr<object> y);
+  object *find_and_call(object *x, vector<object *> *args, string *func_name);
+  object *find_in_parents(object *x, object *y);
 
 private:
-  std::shared_ptr<list> super;
-  std::shared_ptr<list> mro;
+  list *super{nullptr};
+  list *mro{nullptr};
 
-  std::shared_ptr<type> type_object;
+  type *type_object{nullptr};
 
-  std::string name;
-  std::shared_ptr<dict> map;
+  string *name{nullptr};
+  dict *map{nullptr};
 };
 
 } // namespace cppython

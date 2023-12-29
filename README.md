@@ -24,6 +24,7 @@ cmake --build build
 
 + 实现Python3前端。完成从.py源文件到.pyc的转换，对接到解释器，实现一个完整的流程。
 + 重构代码。这个项目也是我练习C++编码的途径，在不断学习C++的过程中，我也会考虑重构这个项目的代码，增加可读性、健壮性。
++ 书上的GC算法存在问题，执行interpreter::eval_frame时，如果触发GC，interpreter::eval_frame中的局部变量如v, w等不会被设置为GC后的内存空间，从而出现空指针异常。目前的临时解决方法是交换 eden 和 survivor 后不清除 survivor 空间内存值。
 
 ## 参考资料
 
