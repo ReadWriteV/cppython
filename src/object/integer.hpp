@@ -2,7 +2,6 @@
 
 #include "object/klass.hpp"
 #include "object/object.hpp"
-#include "utils/singleton.hpp"
 
 #include <concepts>
 
@@ -13,8 +12,21 @@ class oop_closure;
 template <typename T>
 class vector;
 
-class integer_klass : public klass, public singleton<integer_klass> {
-  friend class singleton<integer_klass>;
+class integer_klass : public klass {
+  static integer_klass *instance;
+
+public:
+  static integer_klass *get_instance();
+
+private:
+  integer_klass() = default;
+  ~integer_klass() = default;
+
+public:
+  integer_klass(const integer_klass &) = delete;
+  integer_klass(integer_klass &&) = delete;
+  integer_klass &operator=(const integer_klass &) = delete;
+  integer_klass &operator=(integer_klass &&) = delete;
 
 private:
   template <typename PredicateOperation>

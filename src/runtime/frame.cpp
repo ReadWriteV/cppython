@@ -19,8 +19,6 @@ frame::frame(code_object *code) {
 
   locals = new dict{};
 
-  locals->insert(new string{"__name__"}, new string{"__main__"});
-
   globals = locals;
 }
 
@@ -120,6 +118,27 @@ int frame::get_op_arg() { return codes->code->at(pc++) & 0xFF; }
 unsigned char frame::get_op_code() { return codes->code->at(pc++); }
 
 bool frame::has_more_codes() const { return pc < codes->code->size(); }
+
+string *frame::get_file_name() { return codes->filename->as<string>(); }
+string *frame::get_func_name() { return codes->name->as<string>(); }
+int frame::get_source_lineno() {
+  int pc_offset = 0;
+  int src_line_no = codes->firstlineno;
+
+  auto lnotab = codes->lnotab->as<string>();
+  int length = lnotab->size();
+
+  for (int i = 0; i < length; i++) {
+    pc_offset += lnotab->at(i++);
+    if (pc_offset >= pc) {
+      return src_line_no;
+    }
+
+    src_line_no += lnotab->at(i);
+  }
+
+  return src_line_no;
+}
 
 object *frame::get_cell_from_parameter(int i) {
   auto cells = codes->cellvars;

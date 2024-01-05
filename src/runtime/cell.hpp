@@ -3,15 +3,21 @@
 #include "object/klass.hpp"
 #include "object/list.hpp"
 #include "object/object.hpp"
-#include "utils/singleton.hpp"
 
 namespace cppython {
 
 class object;
 class list;
 
-class cell_klass : public klass, public singleton<cell_klass> {
-  friend class singleton<cell_klass>;
+class cell_klass : public klass {
+public:
+  static cell_klass *get_instance();
+
+public:
+  cell_klass(const cell_klass &) = delete;
+  cell_klass(cell_klass &&) = delete;
+  cell_klass &operator=(const cell_klass &) = delete;
+  cell_klass &operator=(cell_klass &&) = delete;
 
 private:
   cell_klass();

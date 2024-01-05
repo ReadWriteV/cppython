@@ -3,11 +3,14 @@
 #include "memory/heap.hpp"
 #include "memory/oop_closure.hpp"
 #include "object/dict.hpp"
+#include "object/float.hpp"
 #include "object/integer.hpp"
 #include "object/list.hpp"
 #include "object/object.hpp"
 #include "object/string.hpp"
 #include "runtime/function.hpp"
+#include "runtime/interpreter.hpp"
+#include "runtime/module.hpp"
 #include "static_value.hpp"
 #include "utils/vector.hpp"
 
@@ -33,9 +36,11 @@ void static_value::create() {
   // obj_klass->add_super(nullptr);
 
   integer_klass::get_instance()->initialize();
+  float_klass::get_instance()->initialize();
   string_klass::get_instance()->initialize();
   list_klass::get_instance()->initialize();
   dict_klass::get_instance()->initialize();
+  module_klass::get_instance()->initialize();
 
   ty_klass->set_dict(new dict{});
   obj_klass->set_dict(new dict{});
@@ -44,15 +49,18 @@ void static_value::create() {
   obj_klass->set_name("object");
 
   integer_klass::get_instance()->order_supers();
+  float_klass::get_instance()->order_supers();
   string_klass::get_instance()->order_supers();
   list_klass::get_instance()->order_supers();
   dict_klass::get_instance()->order_supers();
-
   ty_klass->order_supers();
 
   function_klass::get_instance()->order_supers();
   native_function_klass::get_instance()->order_supers();
   method_klass::get_instance()->order_supers();
+  module_klass::get_instance()->order_supers();
+
+  interpreter::get_instance()->initialize();
 }
 
 void static_value::destroy() {}
@@ -80,6 +88,8 @@ void cppython::static_value::oops_do(oop_closure *closure) {
 
   closure->do_oop(reinterpret_cast<object *&>(main_code));
   closure->do_vector(klasses);
+
+  closure->do_oop(stop_iteration);
 }
 
 bool value_equal::operator()(object *lhs, object *rhs) const {

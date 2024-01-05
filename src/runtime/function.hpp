@@ -2,7 +2,6 @@
 
 #include "object/klass.hpp"
 #include "object/object.hpp"
-#include "utils/singleton.hpp"
 
 #include <string>
 
@@ -16,8 +15,15 @@ class oop_closure;
 template <typename T>
 class vector;
 
-class function_klass : public klass, public singleton<function_klass> {
-  friend class singleton<function_klass>;
+class function_klass : public klass {
+public:
+  static function_klass *get_instance();
+
+public:
+  function_klass(const function_klass &) = delete;
+  function_klass(function_klass &&) = delete;
+  function_klass &operator=(const function_klass &) = delete;
+  function_klass &operator=(function_klass &&) = delete;
 
 private:
   function_klass();
@@ -71,6 +77,8 @@ private:
 // native functions vvv
 object *len(vector<object *> *args);
 
+object *iter(vector<object *> *args);
+
 object *print(vector<object *> *args);
 
 object *type_of(vector<object *> *args);
@@ -88,9 +96,15 @@ object *build_class(vector<object *> *args);
 object *sysgc(vector<object *> *args);
 // native functions ^^^
 
-class native_function_klass : public klass,
-                              public singleton<native_function_klass> {
-  friend class singleton<native_function_klass>;
+class native_function_klass : public klass {
+public:
+  static native_function_klass *get_instance();
+
+public:
+  native_function_klass(const native_function_klass &) = delete;
+  native_function_klass(native_function_klass &&) = delete;
+  native_function_klass &operator=(const native_function_klass &) = delete;
+  native_function_klass &operator=(native_function_klass &&) = delete;
 
 private:
   native_function_klass();
@@ -116,8 +130,15 @@ private:
   native_function_t *native_func{nullptr};
 };
 
-class method_klass : public klass, public singleton<method_klass> {
-  friend class singleton<method_klass>;
+class method_klass : public klass {
+public:
+  static method_klass *get_instance();
+
+public:
+  method_klass(const method_klass &) = delete;
+  method_klass(method_klass &&) = delete;
+  method_klass &operator=(const method_klass &) = delete;
+  method_klass &operator=(method_klass &&) = delete;
 
 private:
   method_klass();
@@ -146,6 +167,7 @@ public:
   auto &get_func() { return func; }
 
   static bool is_function(object *x);
+  static bool is_yield_function(object *x);
 
 private:
   object *owner{nullptr};

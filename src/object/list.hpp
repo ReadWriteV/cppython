@@ -2,7 +2,6 @@
 
 #include "object/klass.hpp"
 #include "object/object.hpp"
-#include "utils/singleton.hpp"
 #include "utils/vector.hpp"
 
 #include <string>
@@ -14,9 +13,19 @@ class oop_closure;
 template <typename T>
 class vector;
 
-class list_klass : public klass, public singleton<list_klass> {
+class list_klass : public klass {
+public:
+  static list_klass *get_instance();
+
 private:
-  friend class singleton<list_klass>;
+  list_klass() = default;
+  ~list_klass() = default;
+
+public:
+  list_klass(const list_klass &) = delete;
+  list_klass(list_klass &&) = delete;
+  list_klass &operator=(const list_klass &) = delete;
+  list_klass &operator=(list_klass &&) = delete;
 
 public:
   void initialize();
@@ -101,12 +110,21 @@ private:
   vector<object *> *value{nullptr};
 };
 
-class list_iterator_klass : public klass,
-                            public singleton<list_iterator_klass> {
-  friend class singleton<list_iterator_klass>;
+class list_iterator_klass : public klass {
+public:
+  static list_iterator_klass *get_instance();
+
+public:
+  list_iterator_klass(const list_iterator_klass &) = delete;
+  list_iterator_klass(list_iterator_klass &&) = delete;
+  list_iterator_klass &operator=(const list_iterator_klass &) = delete;
+  list_iterator_klass &operator=(list_iterator_klass &&) = delete;
 
 private:
   list_iterator_klass();
+
+public:
+  object *next(object *x) override;
 };
 
 class list_iterator : public object {

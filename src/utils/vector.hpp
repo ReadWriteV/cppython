@@ -1,15 +1,15 @@
 #pragma once
 
-#include "memory/oop_closure.hpp"
-#include "runtime/static_value.hpp"
-
-#include <algorithm>
 #include <concepts>
 #include <cstddef>
 #include <optional>
 #include <utility>
 
 namespace cppython {
+
+class klass;
+class object;
+class oop_closure;
 
 /// @brief a std::vector like container
 /// @tparam T type of element
@@ -18,12 +18,7 @@ class vector {
 public:
   /// @brief construct a vector with n capacity
   /// @param n initial capacity
-  vector(std::size_t n = 8) {
-    length = 0;
-    capacity = n;
-    void *p = static_value::allocate(sizeof(T) * capacity);
-    data_ptr = new (p) T[capacity];
-  }
+  vector(std::size_t n = 8);
 
   /// @brief add element to the back, expend when capacity isn't enough
   /// @param v element to add
@@ -107,31 +102,16 @@ public:
   T *begin() { return data_ptr; }
   T *end() { return data_ptr + length; }
 
-  void *operator new(size_t size) { return static_value::allocate(size); }
+  void *operator new(size_t size);
 
   void oops_do(oop_closure *closure)
-    requires std::same_as<T, klass *> || std::same_as<T, object *>
-  {
-    closure->do_raw_mem(reinterpret_cast<char *&>(data_ptr),
-                        capacity * sizeof(T));
+    requires !std::same_as<T, klass *> && !std::same_as<T, object *>;
 
-    for (size_t i = 0; i < length; i++) {
-      if constexpr (std::is_same_v<T, klass *>) {
-        closure->do_klass(data_ptr[i]);
-      } else {
-        closure->do_oop(data_ptr[i]);
-      }
-    }
-  }
+  void oops_do(oop_closure *closure)
+    requires std::same_as<T, klass *> || std::same_as<T, object *>;
 
 private:
-  void expand() {
-    void *p = static_value::allocate(sizeof(T) * (capacity << 1));
-    auto new_data = new (p) T[capacity << 1];
-    std::copy_n(data_ptr, length, new_data);
-    data_ptr = new_data;
-    capacity <<= 1;
-  }
+  void expand();
 
 private:
   T *data_ptr;

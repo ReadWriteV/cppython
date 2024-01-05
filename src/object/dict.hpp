@@ -4,7 +4,6 @@
 #include "object/object.hpp"
 #include "runtime/static_value.hpp"
 #include "utils/map.hpp"
-#include "utils/singleton.hpp"
 
 #include <string>
 
@@ -13,7 +12,20 @@ namespace cppython {
 class string;
 class oop_closure;
 
-class dict_klass : public klass, public singleton<dict_klass> {
+class dict_klass : public klass {
+public:
+  static dict_klass *get_instance();
+
+private:
+  dict_klass() = default;
+  ~dict_klass() = default;
+
+public:
+  dict_klass(const dict_klass &) = delete;
+  dict_klass(dict_klass &&) = delete;
+  dict_klass &operator=(const dict_klass &) = delete;
+  dict_klass &operator=(dict_klass &&) = delete;
+
 public:
   void initialize();
 
@@ -84,26 +96,34 @@ private:
 enum iter_type { iter_key = 0, iter_value, iter_item };
 
 template <iter_type n>
-class dict_iterator_klass : public klass,
-                            public singleton<dict_iterator_klass<n>> {
+class dict_iterator_klass : public klass {
+public:
+  static dict_iterator_klass *get_instance();
+
+public:
+  dict_iterator_klass(const dict_iterator_klass &) = delete;
+  dict_iterator_klass(dict_iterator_klass &&) = delete;
+  dict_iterator_klass &operator=(const dict_iterator_klass &) = delete;
+  dict_iterator_klass &operator=(dict_iterator_klass &&) = delete;
+
 private:
   dict_iterator_klass();
-  friend class singleton<dict_iterator_klass<n>>;
 
 public:
   object *iter(object *x) override { return x; }
+  object *next(object *x) override;
 };
 
 class dict_iterator : public object {
+public:
+  using klass_type = object_klass; // workaround
+
 public:
   dict_iterator(dict *owner);
 
   auto get_owner() { return dic; }
   int get_iter_cnt() { return iter_cnt; }
   void inc_cnt() { iter_cnt++; }
-
-  template <iter_type n>
-  static object *dict_iterator_next(vector<object *> *args);
 
 private:
   dict *dic{nullptr};

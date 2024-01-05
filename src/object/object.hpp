@@ -1,7 +1,6 @@
 #pragma once
 
 #include "object/klass.hpp"
-#include "utils/singleton.hpp"
 
 #include <cassert>
 #include <concepts>
@@ -11,22 +10,31 @@ namespace cppython {
 
 class oop_closure;
 
-class object_klass : public klass, public singleton<object_klass> {
-  friend class singleton<object_klass>;
+class object_klass : public klass {
+public:
+  static object_klass *get_instance();
+
+private:
+  object_klass() = default;
+  ~object_klass() = default;
+
+public:
+  object_klass(const object_klass &) = delete;
+  object_klass(object_klass &&) = delete;
+  object_klass &operator=(const object_klass &) = delete;
+  object_klass &operator=(object_klass &&) = delete;
 };
 
 class object {
-public:
-  using klass_type = object_klass;
+  // public:
+  //   using klass_type = object_klass;
 
 public:
   virtual ~object() = default;
 
   template <typename T>
     requires requires { typename T::klass_type; } &&
-             std::derived_from<typename T::klass_type, klass> &&
-             std::derived_from<typename T::klass_type,
-                               singleton<typename T::klass_type>>
+             std::derived_from<typename T::klass_type, klass>
   [[nodiscard]] bool is() {
     assert(this != nullptr);
     return get_klass() == T::klass_type::get_instance();
@@ -34,11 +42,9 @@ public:
 
   template <typename T>
     requires requires { typename T::klass_type; } &&
-             std::derived_from<typename T::klass_type, klass> &&
-             std::derived_from<typename T::klass_type,
-                               singleton<typename T::klass_type>>
+             std::derived_from<typename T::klass_type, klass>
   [[nodiscard]] T *as() {
-    assert(is<T>());
+    assert(is<T>() && "Do you define klass_type in T?");
     return static_cast<T *>(this);
   }
 
@@ -69,6 +75,8 @@ public:
   [[nodiscard]] object *getattr(object *x);
   object *setattr(object *x, object *y);
 
+  [[nodiscard]] object *get_klass_attr(object *x);
+
   [[nodiscard]] object *subscr(object *x);
   void store_subscr(object *x, object *y);
   void del_subscr(object *x);
@@ -76,6 +84,7 @@ public:
   [[nodiscard]] object *contains(object *x);
 
   [[nodiscard]] object *iter();
+  [[nodiscard]] object *next();
   [[nodiscard]] object *len();
 
   void *operator new(size_t size);
@@ -92,8 +101,19 @@ private:
   dict *obj_dict{nullptr};
 };
 
-class type_klass : public klass, public singleton<type_klass> {
-  friend class singleton<type_klass>;
+class type_klass : public klass {
+public:
+  static type_klass *get_instance();
+
+private:
+  type_klass() = default;
+  ~type_klass() = default;
+
+public:
+  type_klass(const type_klass &) = delete;
+  type_klass(type_klass &&) = delete;
+  type_klass &operator=(const type_klass &) = delete;
+  type_klass &operator=(type_klass &&) = delete;
 
 public:
   [[nodiscard]] std::string to_string(object *obj) override;

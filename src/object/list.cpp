@@ -12,6 +12,11 @@
 
 using namespace cppython;
 
+list_klass *list_klass::get_instance() {
+  static list_klass instance;
+  return &instance;
+}
+
 void list_klass::initialize() {
   auto map = new dict{};
   map->insert(new string{"append"}, new native_function{list::list_append});
@@ -245,6 +250,11 @@ object *list::list_getitem(vector<object *> *args) {
   return list_obj->at(int_obj->get_value());
 }
 
+list_iterator_klass *list_iterator_klass::get_instance() {
+  static list_iterator_klass instance;
+  return &instance;
+}
+
 list_iterator_klass::list_iterator_klass() {
   auto map = new dict{};
 
@@ -253,6 +263,12 @@ list_iterator_klass::list_iterator_klass() {
 
   set_dict(map);
   set_name("listiterator");
+}
+
+object *list_iterator_klass::next(object *x) {
+  auto args = new vector<object *>{};
+  args->push_back(x);
+  return list_iterator::list_iterator_next(args);
 }
 
 list_iterator::list_iterator(list *lst) : lst{lst} {
@@ -269,7 +285,7 @@ object *list_iterator::list_iterator_next(vector<object *> *args) {
     auto obj = lst->at(iter_cnt);
     list_iter_obj->inc_cnt();
     return obj;
-  } else { // TODO : we need Traceback here to mark iteration end
+  } else { // TODO : we need traceback here to mark iteration end
     return nullptr;
   }
 }

@@ -2,7 +2,6 @@
 
 #include "object/klass.hpp"
 #include "object/object.hpp"
-#include "utils/singleton.hpp"
 #include "utils/vector.hpp"
 
 #include <concepts>
@@ -10,8 +9,15 @@
 
 namespace cppython {
 
-class tuple_klass : public klass, public singleton<tuple_klass> {
-  friend class singleton<tuple_klass>;
+class tuple_klass : public klass {
+public:
+  static tuple_klass *get_instance();
+
+public:
+  tuple_klass(const tuple_klass &) = delete;
+  tuple_klass(tuple_klass &&) = delete;
+  tuple_klass &operator=(const tuple_klass &) = delete;
+  tuple_klass &operator=(tuple_klass &&) = delete;
 
 private:
   tuple_klass();

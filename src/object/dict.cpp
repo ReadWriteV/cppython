@@ -10,6 +10,11 @@
 
 using namespace cppython;
 
+dict_klass *dict_klass::get_instance() {
+  static dict_klass instance;
+  return &instance;
+}
+
 void dict_klass::initialize() {
   auto map = new dict{};
   map->insert(new string{"setdefault"},
@@ -200,6 +205,12 @@ object *dict::dict_iteritems(vector<object *> *args) {
 }
 
 template <iter_type n>
+dict_iterator_klass<n> *dict_iterator_klass<n>::get_instance() {
+  static dict_iterator_klass<n> instance;
+  return &instance;
+}
+
+template <iter_type n>
 dict_iterator_klass<n>::dict_iterator_klass() {
 
   std::string_view klass_names[] = {
@@ -207,19 +218,13 @@ dict_iterator_klass<n>::dict_iterator_klass() {
       "dictionary-valueiterator",
       "dictionary-itemiterator",
   };
-  auto dic = new dict{};
-  dic->insert(string_table::get_instance()->next_str,
-              new native_function{dict_iterator::dict_iterator_next<n>});
-  set_dict(dic);
+  set_dict(new dict{});
   set_name(klass_names[n]);
 }
 
-dict_iterator::dict_iterator(dict *owner) : dic{owner} {}
-
 template <iter_type n>
-object *dict_iterator::dict_iterator_next(vector<object *> *args) {
-  auto arg_0 = args->at(0);
-  auto dict_iter_obj = arg_0->as<dict_iterator>();
+object *dict_iterator_klass<n>::next(object *x) {
+  auto dict_iter_obj = x->as<dict_iterator>();
 
   auto dic = dict_iter_obj->get_owner();
   int iter_cnt = dict_iter_obj->get_iter_cnt();
@@ -238,8 +243,10 @@ object *dict_iterator::dict_iterator_next(vector<object *> *args) {
     }
     dict_iter_obj->inc_cnt();
     return obj;
-  } else // TODO : we need Traceback here to mark iteration end
+  } else // TODO : we need traceback here to mark iteration end
   {
     return nullptr;
   }
 }
+
+dict_iterator::dict_iterator(dict *owner) : dic{owner} {}

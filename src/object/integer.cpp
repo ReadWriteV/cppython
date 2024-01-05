@@ -10,7 +10,17 @@
 
 using namespace cppython;
 
+integer_klass *integer_klass::instance = nullptr;
+
+integer_klass *integer_klass::get_instance() {
+  if (instance == nullptr) {
+    instance = new integer_klass;
+  }
+  return instance;
+}
+
 void integer_klass::initialize() {
+
   set_name("int");
   set_dict(new dict{});
   (new type{})->set_own_klass(this);

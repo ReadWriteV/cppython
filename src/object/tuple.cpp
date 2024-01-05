@@ -6,6 +6,11 @@
 
 using namespace cppython;
 
+tuple_klass *tuple_klass::get_instance() {
+  static tuple_klass instance;
+  return &instance;
+}
+
 tuple_klass::tuple_klass() {
   set_name("tuple");
   (new type{})->set_own_klass(this);

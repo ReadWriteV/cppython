@@ -3,6 +3,11 @@
 
 using namespace cppython;
 
+code_klass *code_klass::get_instance() {
+  static code_klass instance;
+  return &instance;
+}
+
 code_klass::code_klass() {
   set_name("code");
   add_super(object_klass::get_instance());

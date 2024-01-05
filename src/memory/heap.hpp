@@ -1,7 +1,5 @@
 #pragma once
 
-#include "utils/singleton.hpp"
-
 namespace cppython {
 
 class object;
@@ -26,8 +24,15 @@ private:
   size_t capacity;
 };
 
-class heap : public singleton<heap> {
-  friend class singleton<heap>;
+class heap {
+public:
+  static heap *get_instance();
+
+public:
+  heap(const heap &) = delete;
+  heap(heap &&) = delete;
+  heap &operator=(const heap &) = delete;
+  heap &operator=(heap &&) = delete;
 
 private:
   heap(size_t size = MAX_CAP);

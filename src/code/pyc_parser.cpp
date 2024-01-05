@@ -1,5 +1,6 @@
 #include "code/pyc_parser.hpp"
 #include "code/code_object.hpp"
+#include "object/float.hpp"
 #include "object/integer.hpp"
 #include "object/string.hpp"
 #include "object/tuple.hpp"
@@ -48,6 +49,9 @@ object *pyc_parser::parse_object() {
     break;
   case 'i': // integer
     return get_integer(ref_flag);
+    break;
+  case 'g': // float
+    return get_float(ref_flag);
     break;
   case 'r':
   case 'R': // ref integer
@@ -147,6 +151,14 @@ string *pyc_parser::get_string(bool ref_flag) {
 
 integer *pyc_parser::get_integer(bool ref_flag) {
   auto tmp = new integer{reader.read<int>()};
+  if (ref_flag) {
+    ref_table.push_back(tmp);
+  }
+  return tmp;
+}
+
+float_num *pyc_parser::get_float(bool ref_flag) {
+  auto tmp = new float_num{reader.read<double>()};
   if (ref_flag) {
     ref_table.push_back(tmp);
   }

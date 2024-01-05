@@ -10,6 +10,11 @@
 
 using namespace cppython;
 
+object_klass *object_klass::get_instance() {
+  static object_klass instance;
+  return &instance;
+}
+
 std::string object::to_string() { return get_klass()->to_string(this); }
 
 object *object::add(object *x) { return get_klass()->add(this, x); }
@@ -40,6 +45,10 @@ object *cppython::object::setattr(object *x, object *y) {
   return get_klass()->setattr(this, x, y);
 }
 
+object *object::get_klass_attr(object *x) {
+  return get_klass()->get_klass_attr(this, x);
+}
+
 object *object::subscr(object *x) { return get_klass()->subscr(this, x); }
 
 void object::store_subscr(object *x, object *y) {
@@ -51,6 +60,8 @@ void object::del_subscr(object *x) { get_klass()->del_subscr(this, x); }
 object *object::contains(object *x) { return get_klass()->contains(this, x); }
 
 object *object::iter() { return get_klass()->iter(this); }
+
+object *object::next() { return get_klass()->next(this); }
 
 object *object::len() { return get_klass()->len(this); }
 
@@ -76,6 +87,11 @@ void object::set_new_address(char *addr) {
     return;
   }
   mark_word = reinterpret_cast<intmax_t>(addr) | 0x1;
+}
+
+type_klass *type_klass::get_instance() {
+  static type_klass instance;
+  return &instance;
 }
 
 std::string type_klass::to_string(object *obj) {

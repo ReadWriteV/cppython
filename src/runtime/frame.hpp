@@ -11,11 +11,12 @@ class dict;
 class function;
 class code_object;
 class oop_closure;
+class string;
 
 template <typename T>
 class vector;
 
-struct loop_block {
+struct block {
   unsigned char type;
   size_t target;
   size_t level;
@@ -45,6 +46,11 @@ public:
   auto get_globals() { return globals; }
   auto get_fast_locals() { return fast_locals; }
   auto get_closure() { return closure; }
+
+  string *get_file_name();
+  string *get_func_name();
+  int get_source_lineno();
+
   object *get_cell_from_parameter(int i);
 
   bool has_more_codes() const;
@@ -58,7 +64,7 @@ private:
   bool entry{false};
 
   list *data_stack{nullptr};
-  std::stack<loop_block> loop_stack;
+  std::stack<block> loop_stack;
 
   code_object *codes{nullptr};
 

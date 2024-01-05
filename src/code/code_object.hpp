@@ -1,7 +1,6 @@
 #pragma once
 
 #include "object/object.hpp"
-#include "utils/singleton.hpp"
 
 #include <string>
 
@@ -11,8 +10,15 @@ class string;
 class tuple;
 class oop_closure;
 
-class code_klass : public klass, public singleton<code_klass> {
-  friend class singleton<code_klass>;
+class code_klass : public klass {
+public:
+  static code_klass *get_instance();
+
+public:
+  code_klass(const code_klass &) = delete;
+  code_klass(code_klass &&) = delete;
+  code_klass &operator=(const code_klass &) = delete;
+  code_klass &operator=(code_klass &&) = delete;
 
 private:
   code_klass();

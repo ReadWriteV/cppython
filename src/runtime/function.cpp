@@ -14,6 +14,11 @@
 
 using namespace cppython;
 
+function_klass *function_klass::get_instance() {
+  static function_klass instance;
+  return &instance;
+}
+
 function_klass::function_klass() {
   add_super(object_klass::get_instance());
   set_name("function");
@@ -52,6 +57,11 @@ object *cppython::len(vector<object *> *args) {
   return arg_0->len();
 }
 
+object *cppython::iter(vector<object *> *args) {
+  auto arg_0 = args->at(0);
+  return arg_0->iter();
+}
+
 object *cppython::print(vector<object *> *args) {
 
   for (size_t i{0}; i < args->size(); i++) {
@@ -73,6 +83,10 @@ object *cppython::isinstance(vector<object *> *args) {
   auto type_obj = y->as<type>();
 
   auto k = x->get_klass();
+
+  if (k->get_type_object() == y) {
+    return static_value::true_value;
+  }
 
   for (auto e : *(k->get_mro()->get_value())) {
     if (e == y) {
@@ -119,6 +133,11 @@ object *cppython::sysgc(vector<object *> *args) {
   return static_value::none_value;
 }
 
+native_function_klass *native_function_klass::get_instance() {
+  static native_function_klass instance;
+  return &instance;
+}
+
 native_function_klass::native_function_klass() {
   add_super(function_klass::get_instance());
   set_name("native function");
@@ -140,6 +159,11 @@ native_function::native_function(native_function_t *native_func)
 
 object *native_function::call(vector<object *> *args) {
   return (*native_func)(args);
+}
+
+method_klass *method_klass::get_instance() {
+  static method_klass instance;
+  return &instance;
 }
 
 method_klass::method_klass() {
@@ -177,4 +201,13 @@ bool method::is_function(object *x) {
   }
 
   return false;
+}
+
+bool method::is_yield_function(object *x) {
+  if (!x->is<function>()) {
+    return false;
+  }
+
+  auto fo = x->as<function>();
+  return (fo->get_flags() & function::generator) != 0;
 }

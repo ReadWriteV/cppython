@@ -10,6 +10,7 @@ namespace cppython {
 class code_object;
 class object;
 class integer;
+class float_num;
 class string;
 class tuple;
 
@@ -27,6 +28,7 @@ private:
   code_object *get_code_object(bool ref_flag);
   string *get_string(bool ref_flag);
   integer *get_integer(bool ref_flag);
+  float_num *get_float(bool ref_flag);
   string *get_short_ascii(bool ref_flag);
   tuple *get_tuple(bool ref_flag);
 

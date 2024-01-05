@@ -98,6 +98,15 @@ std::weak_ordering klass::compare(klass *x, klass *y) {
 }
 
 std::string klass::to_string(object *obj) {
+
+  auto repr_method =
+      get_klass_attr(obj, string_table::get_instance()->repr_str);
+  if (repr_method != static_value::none_value) {
+    return interpreter::get_instance()
+        ->call_virtual(repr_method, nullptr)
+        ->to_string();
+  }
+
   return std::format("<{} object at {:p}>",
                      obj->get_klass()->get_type_object()->get_type_name(),
                      static_cast<void *>(obj));
@@ -137,12 +146,7 @@ object *klass::getattr(object *x, object *y) {
     }
   }
 
-  auto result = find_in_parents(x, y);
-
-  if (method::is_function(result)) {
-    result = new method{static_cast<function *>(result), x};
-  }
-  return result;
+  return get_klass_attr(x, y);
 }
 
 object *klass::setattr(object *x, object *y, object *z) {
@@ -170,6 +174,24 @@ object *klass::setattr(object *x, object *y, object *z) {
   return static_value::none_value;
 }
 
+object *klass::get_klass_attr(object *x, object *y) {
+  auto result = find_in_parents(x, y);
+  if (method::is_function(result)) {
+    // TODO: result maybe a native function, we will check it again, and cast it
+    // to native_function when invoke this method in build_frame
+    result = new method{static_cast<function *>(result), x};
+  }
+  return result;
+}
+
+object *klass::iter(object *x) {
+  return find_and_call(x, nullptr, string_table::get_instance()->iter_str);
+}
+
+object *klass::next(object *x) {
+  return find_and_call(x, nullptr, string_table::get_instance()->next_str);
+}
+
 object *klass::len(object *x) {
   return find_and_call(x, nullptr, string_table::get_instance()->len_str);
 }
@@ -195,7 +217,8 @@ object *klass::allocate_instance(object *obj_type, vector<object *> *args) {
   auto type_obj = obj_type->as<type>();
   inst->set_klass(type_obj->get_own_klass());
 
-  auto constructor = inst->getattr(string_table::get_instance()->init_str);
+  auto constructor =
+      inst->get_klass_attr(string_table::get_instance()->init_str);
   if (constructor != static_value::none_value) {
     interpreter::get_instance()->call_virtual(constructor, args);
   }
@@ -222,7 +245,7 @@ size_t klass::size() const { return sizeof(object); }
 
 object *klass::find_and_call(object *x, vector<object *> *args,
                              string *func_name) {
-  auto func = x->getattr(func_name);
+  auto func = x->get_klass_attr(func_name);
   if (func != static_value::none_value) {
     return interpreter::get_instance()->call_virtual(func, args);
   }

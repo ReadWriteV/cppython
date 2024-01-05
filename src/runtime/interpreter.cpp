@@ -9,8 +9,12 @@
 #include "object/tuple.hpp"
 #include "runtime/cell.hpp"
 #include "runtime/function.hpp"
+#include "runtime/generator.hpp"
+#include "runtime/module.hpp"
 #include "runtime/static_value.hpp"
 #include "runtime/string_table.hpp"
+#include "runtime/traceback.hpp"
+#include "utils/handle.hpp"
 
 #include <cassert>
 #include <functional>
@@ -19,8 +23,13 @@
 
 using namespace cppython;
 
-interpreter::interpreter() {
-  builtins = new dict{};
+interpreter *interpreter::get_instance() {
+  static interpreter instance;
+  return &instance;
+}
+
+void interpreter::initialize() {
+  builtins = new module{new dict{}};
 
   // builtin values
   builtins->insert(new string("True"), static_value::true_value);
@@ -30,6 +39,7 @@ interpreter::interpreter() {
   // builtin functions
   builtins->insert(new string("print"), new native_function(print));
   builtins->insert(new string("len"), new native_function(len));
+  builtins->insert(new string("iter"), new native_function(iter));
   builtins->insert(new string("type"), new native_function(type_of));
   builtins->insert(new string("isinstance"), new native_function(isinstance));
   builtins->insert(new string("super"), new native_function(builtin_super));
@@ -46,12 +56,47 @@ interpreter::interpreter() {
                    list_klass::get_instance()->get_type_object());
   builtins->insert(new string("dict"),
                    dict_klass::get_instance()->get_type_object());
+
+  builtins->extend(module::import(new string{"builtin"}));
+
+  static_value::stop_iteration = builtins->get(new string("StopIteration"));
+
+  modules = new dict();
+  modules->insert(new string{"__builtins__"}, builtins);
 }
 
 void interpreter::run(code_object *codes) {
   cur_frame = new frame{codes};
+  cur_frame->get_locals()->insert(string_table::get_instance()->name_str,
+                                  new string{"__main__"});
+
   eval_frame();
+
+  if (cur_status == status::is_exception) {
+    cur_status = status::is_ok;
+
+    std::print("{}", trace_back->to_string());
+    std::println("Exception: {}", pending_exception->to_string());
+
+    trace_back = nullptr;
+    pending_exception = nullptr;
+    exception_class = nullptr;
+  }
+
   destroy_frame();
+}
+
+dict *interpreter::run_module(code_object *codes, string *module_name) {
+  auto module_frame = new frame{codes};
+  module_frame->set_entry_frame(true);
+  module_frame->get_locals()->insert(string_table::get_instance()->name_str,
+                                     module_name);
+
+  enter_frame(module_frame);
+  eval_frame();
+  auto result = module_frame->get_locals();
+  destroy_frame();
+  return result;
 }
 
 void interpreter::eval_frame() {
@@ -111,7 +156,7 @@ void interpreter::eval_frame() {
       push_data(w->mod(v));
       break;
     }
-    case INPLACE_ADD: {
+    case INPLACE_ADD:
     case BINARY_ADD: {
       auto v = pop_data();
       auto w = pop_data();
@@ -130,7 +175,13 @@ void interpreter::eval_frame() {
       push_data(w->mul(v));
       break;
     }
-
+    case INPLACE_DIVIDE:
+    case BINARY_DIVIDE: {
+      auto v = pop_data();
+      auto w = pop_data();
+      push_data(w->div(v));
+      break;
+    }
     case BINARY_SUBSCR: {
       auto v = pop_data();
       auto w = pop_data();
@@ -179,14 +230,16 @@ void interpreter::eval_frame() {
     }
     case FOR_ITER: {
       auto v = top_data();
+      auto w = v->next();
 
-      auto w = v->getattr(string_table::get_instance()->next_str);
-
-      build_frame(w, nullptr);
-
-      if (top_data() == nullptr) {
+      if (w == nullptr) {
+        // assert(cur_status == status::is_exception &&
+        //        pending_exception == static_value::stop_iteration);
         cur_frame->set_pc(cur_frame->get_pc() + op_arg);
-        pop_data();
+        cur_status = status::is_ok;
+        pending_exception = nullptr;
+      } else {
+        push_data(w);
       }
       break;
     }
@@ -201,29 +254,25 @@ void interpreter::eval_frame() {
       break;
     }
 
-    case BREAK_LOOP:
-      while (!cur_frame->get_data_stack()->empty() &&
-             cur_frame->get_data_stack()->size() >
-                 cur_frame->get_loop_stack().top().level) {
-        pop_data();
-      }
-      cur_frame->set_pc(cur_frame->get_loop_stack().top().target);
-      cur_frame->get_loop_stack().pop();
-      break;
-
     case LOAD_LOCALS:
       push_data(cur_frame->get_locals());
       break;
 
     case RETURN_VALUE: {
       ret_value = pop_data();
-      if (cur_frame->is_first_frame() || cur_frame->is_entry_frame()) {
-        return;
-      }
-      leave_frame();
+      // if (cur_frame->is_first_frame() || cur_frame->is_entry_frame()) {
+      //   return;
+      // }
+      // leave_frame();
+      cur_status = status::is_return;
       break;
     }
-
+    case YIELD_VALUE:
+      // we are assured that we're in the progress
+      // of evalating generator.
+      cur_status = status::is_yield;
+      ret_value = top_data();
+      return;
     case POP_BLOCK:
       while (!cur_frame->get_data_stack()->empty() &&
              cur_frame->get_data_stack()->size() >
@@ -238,6 +287,22 @@ void interpreter::eval_frame() {
       cur_frame->get_locals()->insert(v, pop_data());
       break;
     }
+
+    case POP_EXCEPT:
+      // while (!cur_frame->get_data_stack()->empty() &&
+      //        cur_frame->get_data_stack()->size() >
+      //            cur_frame->get_loop_stack().top().level) {
+      //   pop_data();
+      // }
+      // cur_frame->get_loop_stack().pop();
+      break;
+
+    case DELETE_NAME: {
+      auto v = cur_frame->get_names()->at(op_arg);
+      cur_frame->get_locals()->remove(v);
+      break;
+    }
+
     case STORE_ATTR: {
       auto u = pop_data();
       auto v = cur_frame->get_names()->at(op_arg);
@@ -265,10 +330,7 @@ void interpreter::eval_frame() {
                      return cur_frame->get_globals()->get(target_name,
                                                           value_equal{});
                    })
-                   .or_else([this, &target_name]() {
-                     return builtins->get(target_name, value_equal{});
-                   })
-                   .value_or(static_value::none_value);
+                   .value_or(builtins->get(target_name));
 
       push_data(r);
       break;
@@ -300,6 +362,26 @@ void interpreter::eval_frame() {
       push_data(v->getattr(w));
       break;
     }
+    case IMPORT_NAME: {
+      pop_data();
+      pop_data();
+      auto v = cur_frame->get_names()->at(op_arg);
+      auto w = modules->at(v);
+      if (w == static_value::none_value) {
+        w = module::import(v);
+        modules->insert(v, w);
+      }
+      push_data(w);
+      break;
+    }
+    case IMPORT_FROM: {
+      auto v = cur_frame->get_names()->at(op_arg);
+      auto w = top_data();
+      auto u = w->as<module>()->get(v);
+      push_data(u);
+      break;
+    }
+
     case COMPARE_OP: {
       auto w = pop_data();
       auto v = pop_data();
@@ -324,33 +406,6 @@ void interpreter::eval_frame() {
         break;
       case greater_equal:
         push_data(v->ge(w));
-        break;
-      case in:
-        push_data(w->contains(v));
-        break;
-      case not_in: {
-        auto r = w->contains(v);
-        if (r == static_value::true_value) {
-          push_data(static_value::false_value);
-        } else {
-          push_data(r);
-        }
-        break;
-      }
-      case is:
-        if (v == w) {
-          push_data(static_value::true_value);
-        } else {
-          push_data(static_value::false_value);
-        };
-        break;
-
-      case is_not:
-        if (v == w) {
-          push_data(static_value::false_value);
-        } else {
-          push_data(static_value::true_value);
-        };
         break;
       default:
         std::println("Error: Unrecognized compare op {:#4x}", op_arg);
@@ -379,10 +434,7 @@ void interpreter::eval_frame() {
 
       auto r = cur_frame->get_globals()
                    ->get(target_name, value_equal{})
-                   .or_else([this, &target_name]() {
-                     return builtins->get(target_name, value_equal{});
-                   })
-                   .value_or(static_value::none_value);
+                   .value_or(builtins->get(target_name));
       push_data(r);
       break;
     }
@@ -394,7 +446,28 @@ void interpreter::eval_frame() {
       break;
     }
 
-    case SETUP_LOOP:
+    case JUMP_IF_NOT_EXC_MATCH: {
+      auto u = pop_data(); // TOS
+      auto v = pop_data(); // the second value
+
+      bool match = false;
+      auto mro_lst = v->as<type>()->get_own_klass()->get_mro()->get_value();
+
+      if (v == u) {
+        match = true;
+      } else {
+        match =
+            std::find(mro_lst->begin(), mro_lst->end(), u) != mro_lst->end();
+      }
+
+      if (!match) {
+        cur_frame->set_pc(op_arg);
+      }
+
+      break;
+    }
+
+    case SETUP_FINALLY:
       cur_frame->get_loop_stack().push({op_code, cur_frame->get_pc() + op_arg,
                                         cur_frame->get_data_stack()->size()});
       break;
@@ -406,6 +479,35 @@ void interpreter::eval_frame() {
     case STORE_FAST:
       cur_frame->get_fast_locals()->set_at(op_arg, pop_data());
       break;
+
+    case RAISE_VARARGS: {
+      switch (op_arg) {
+      case 0: // raise (re-raise previous exception)
+        // auto u = pop_data();
+        // w = pending_exception;
+        assert(false && "raise (re-raise previous exception)");
+        break;
+      case 1: // raise TOS (raise exception instance or type at TOS)
+      {
+        auto u = pop_data();
+        if (u->is<type>()) {
+          do_raise(u, nullptr, nullptr);
+        } else {
+          do_raise(u->get_klass()->get_type_object(), u, nullptr);
+        }
+        break;
+      }
+      case 2: // raise TOS1 from TOS (raise exception instance or type at TOS1
+              // with __cause__ set to TOS)
+      {
+        auto u = pop_data();
+        auto w = pop_data();
+        assert(false && "raise TOS1 from TOS");
+        break;
+      }
+      }
+      break;
+    }
 
     case CALL_FUNCTION: {
       vector<object *> *args{nullptr};
@@ -485,6 +587,22 @@ void interpreter::eval_frame() {
       cur_frame->get_closure()->set_at(op_arg, pop_data());
       break;
 
+    case MAKE_CLOSURE: { // NOT in Python 3
+      auto v = pop_data();
+      auto f = new function{v};
+      f->set_closure(pop_data()->as<list>());
+      f->set_globals(cur_frame->get_globals());
+      if (op_arg > 0) {
+        auto args = new vector<object *>(op_arg);
+        while (op_arg--) {
+          args->set(op_arg, pop_data());
+        }
+        f->set_default_args(args);
+      }
+      push_data(f);
+      break;
+    }
+
     case CALL_FUNCTION_KW: {
       auto args = new vector<object *>{};
       if (op_arg > 0) {
@@ -563,6 +681,54 @@ void interpreter::eval_frame() {
     default:
       std::println("Error: Unrecognized byte code {:#04x}", op_code);
     }
+
+    while (cur_status != status::is_ok &&
+           cur_frame->get_loop_stack().size() != 0) {
+
+      auto b = cur_frame->get_loop_stack().top();
+      cur_frame->get_loop_stack().pop();
+
+      while (cur_frame->get_data_stack()->size() > b.level) {
+        pop_data();
+      }
+
+      if (b.type == std::to_underlying(bytecode::SETUP_FINALLY) ||
+          cur_status == status::is_exception) {
+        if (cur_status == status::is_exception) {
+          // traceback, value, exception class
+          push_data(trace_back);
+          push_data(pending_exception);
+          push_data(exception_class);
+
+          trace_back = nullptr;
+          pending_exception = nullptr;
+          exception_class = nullptr;
+
+        } else {
+          if (cur_status == status::is_return) {
+            push_data(ret_value);
+          }
+        }
+        cur_frame->set_pc(b.target);
+        cur_status = status::is_ok;
+      }
+    }
+
+    // has pending exception and no handler found, unwind stack.
+    if (cur_status != status::is_ok &&
+        cur_frame->get_loop_stack().size() == 0) {
+      if (cur_status == status::is_exception) {
+        ret_value = nullptr;
+        trace_back->as<traceback>()->record_frame(cur_frame);
+      }
+      if (cur_status == status::is_return) {
+        cur_status = status::is_ok;
+      }
+
+      if (cur_frame->is_first_frame() || cur_frame->is_entry_frame()) {
+        return;
+      }
+      leave_frame();
     }
   }
 }
@@ -591,6 +757,10 @@ void interpreter::build_frame(object *callable, vector<object *> *args,
     }
     args->insert(0, method_obj->get_owner());
     build_frame(method_obj->get_func(), args, real_arg_cnt + 1, has_kw_arg);
+  } else if (method::is_yield_function(callable)) {
+    auto g = new generator{callable->as<function>(), args, real_arg_cnt};
+    push_data(g);
+    return;
   } else if (callable->get_klass() == function_klass::get_instance()) {
     auto func = callable->as<function>();
     auto new_frame = new frame{func, args, real_arg_cnt, has_kw_arg};
@@ -600,7 +770,7 @@ void interpreter::build_frame(object *callable, vector<object *> *args,
     auto obj = obj_type->get_own_klass()->allocate_instance(callable, args);
     push_data(obj);
   } else {
-    auto m = callable->getattr(string_table::get_instance()->call_str);
+    auto m = callable->get_klass_attr(string_table::get_instance()->call_str);
     if (m != static_value::none_value)
       build_frame(m, args, real_arg_cnt, has_kw_arg);
     else {
@@ -637,7 +807,8 @@ object *interpreter::call_virtual(object *func, vector<object *> *args) {
     return call_virtual(method_obj->get_func(), args);
   } else if (method::is_function(func)) {
     auto func_obj = func->as<function>();
-    auto new_frame = new frame{func_obj, args, static_cast<int>(args->size())};
+    auto new_frame = new frame{
+        func_obj, args, args == nullptr ? 0 : static_cast<int>(args->size())};
     new_frame->set_entry_frame(true);
     enter_frame(new_frame);
     eval_frame();
@@ -649,9 +820,61 @@ object *interpreter::call_virtual(object *func, vector<object *> *args) {
 
 void interpreter::oops_do(oop_closure *f) {
   f->do_oop(reinterpret_cast<object *&>(builtins));
-  f->do_oop(reinterpret_cast<object *&>(ret_value));
+  f->do_oop(ret_value);
+  f->do_oop(reinterpret_cast<object *&>(modules));
+  f->do_oop(exception_class);
+  f->do_oop(pending_exception);
+  f->do_oop(trace_back);
 
   if (cur_frame) {
     cur_frame->oops_do(f);
   }
+}
+
+interpreter::status interpreter::do_raise(object *exc, object *val,
+                                          object *tb) {
+
+  assert(exc != nullptr);
+
+  cur_status = status::is_exception;
+
+  if (tb == nullptr) {
+    tb = new traceback();
+  }
+
+  if (val != nullptr) {
+    exception_class = exc;
+    pending_exception = val;
+    trace_back = tb;
+    return status::is_exception;
+  }
+
+  if (exc->is<type>()) {
+    exception_class = exc;
+    pending_exception = call_virtual(exc, nullptr);
+  } else {
+    pending_exception = exc;
+    exception_class = pending_exception->get_klass()->get_type_object();
+  }
+  trace_back = tb;
+  return status::is_exception;
+}
+
+object *interpreter::eval_generator(generator *g) {
+  handle handle{g};
+  enter_frame(g->get_frame());
+  g->get_frame()->set_entry_frame(true);
+  eval_frame();
+
+  if (cur_status != status::is_yield) { // return from generator
+    cur_status = status::is_ok;
+    leave_frame();
+    handle()->as<generator>()->set_frame(nullptr);
+    return nullptr;
+  }
+
+  cur_status = status::is_ok;
+  cur_frame = cur_frame->get_caller();
+
+  return ret_value;
 }

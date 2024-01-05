@@ -18,10 +18,14 @@ class A(object):
     def __setitem__(self, k, v):
         print(k, v)
 
+    def __repr__(self):
+        return "class A"
+
 
 a = A(1)
 b = A(2)
 
+print(a)
 print(a + b)
 print(len(a))
 a("hello world")

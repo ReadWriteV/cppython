@@ -4,7 +4,7 @@
 #include "runtime/interpreter.hpp"
 #include "runtime/static_value.hpp"
 #include "runtime/string_table.hpp"
-// #include "utils/handles.hpp"
+#include "utils/handle.hpp"
 #include "utils/map.hpp"
 #include "utils/vector.hpp"
 
@@ -134,6 +134,6 @@ void scavenge_oop_closure::scavenge() {
 void scavenge_oop_closure::process_roots() {
   static_value::oops_do(this);
   interpreter::get_instance()->oops_do(this);
-  // HandleMark::get_instance()->oops_do(this);
+  handle_mark::get_instance()->oops_do(this);
   string_table::get_instance()->oops_do(this);
 }

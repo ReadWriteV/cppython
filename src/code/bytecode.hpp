@@ -18,6 +18,9 @@ enum class bytecode : unsigned char {
   BINARY_ADD = 23,
   BINARY_SUBTRACT = 24,
 
+  // Re-raises the exception currently on top of the stack.
+  RERAISE = 0x30,
+
   INPLACE_ADD = 55,
   STORE_MAP = 54,
   INPLACE_SUBSTRACT = 56,
@@ -37,15 +40,28 @@ enum class bytecode : unsigned char {
   LOAD_LOCALS = 82,
   RETURN_VALUE = 83,
   YIELD_VALUE = 86,
+
+  // Removes one block from the block stack. Per frame, there is a stack of
+  // blocks, denoting try statements, and such.
   POP_BLOCK = 87,
   END_FINALLY = 88,
-  BUILD_CLASS = 89,
+
+  // Removes one block from the block stack. The popped block must be an
+  // exception handler block, as implicitly created when entering an except
+  // handler. In addition to popping extraneous values from the frame stack, the
+  // last three popped values are used to restore the exception state.
+  POP_EXCEPT = 0x59,
 
   // TODO: This is a separator
   /* Opcodes from here have an argument: */
   HAVE_ARGUMENT = 90,
 
   STORE_NAME = 90,
+
+  // Implements del name, where namei is the index into co_names attribute of
+  // the code object.
+  DELETE_NAME = 0x5b,
+
   UNPACK_SEQUENCE = 92,
   FOR_ITER = 93,
   STORE_ATTR = 95, /* Index in name list */
@@ -73,10 +89,13 @@ enum class bytecode : unsigned char {
 
   IS_OP = 117,
 
-  CONTINUE_LOOP = 119, /* Start of loop (absolute) */
-  SETUP_LOOP = 120,    /* Target address (relative) */
-  SETUP_EXCEPT = 121,  /* "" */
-  SETUP_FINALLY = 122, /* "" */
+  // Tests whether the second value on the stack is an exception matching TOS,
+  // and jumps if it is not. Pops two values from the stack.
+  JUMP_IF_NOT_EXC_MATCH = 0x79,
+
+  // Pushes a try block from a try-finally or try-except clause onto the block
+  // stack. delta points to the finally block or the first except block.
+  SETUP_FINALLY = 122,
 
   LOAD_FAST = 124,  /* Local variable number */
   STORE_FAST = 125, /* Local variable number */
@@ -109,11 +128,6 @@ enum class compare : unsigned char {
   not_equal,
   greater,
   greater_equal,
-  in,
-  not_in,
-  is,
-  is_not,
-  exc_match
 };
 
 } // namespace cppython

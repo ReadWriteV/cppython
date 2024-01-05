@@ -51,6 +51,11 @@ void space::clear(bool reset_mem) {
 
 bool space::has_obj(char *obj) const { return obj >= base && end > obj; }
 
+heap *heap::get_instance() {
+  static heap instance;
+  return &instance;
+}
+
 heap::heap(size_t size) {
   eden = new space{size};
   survivor = new space{size};

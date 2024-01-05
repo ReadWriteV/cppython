@@ -10,12 +10,19 @@
 
 using namespace cppython;
 
+string_klass *string_klass::get_instance() {
+  static string_klass instance;
+  return &instance;
+}
+
 void string_klass::initialize() {
 
   auto string_dict = new dict{};
 
   string_dict->insert(new string{"upper"},
                       new native_function{string::string_upper});
+  string_dict->insert(new string{"join"},
+                      new native_function{string::string_join});
 
   set_dict(string_dict);
 
@@ -27,6 +34,18 @@ void string_klass::initialize() {
 std::string string_klass::to_string(object *obj) {
   auto p = obj->as<string>();
   return std::string{p->data(), p->size()};
+}
+
+object *string_klass::add(object *x, object *y) {
+  auto sx = x->as<string>();
+  auto sy = y->as<string>();
+
+  auto sz = new string{sx->size() + sy->size() + 1};
+
+  auto iter = std::copy(sx->begin(), sx->end(), sz->begin());
+  iter = std::copy(sy->begin(), sy->end(), iter);
+  *iter = '\0';
+  return sz;
 }
 
 object *string_klass::equal(object *x, object *y) {
@@ -105,6 +124,12 @@ string::string(const std::size_t cnt, const char ch) {
   set_klass(string_klass::get_instance());
 }
 
+string::string(const std::size_t cnt) {
+  length = cnt;
+  data_ptr = static_cast<char *>(static_value::allocate(length));
+  set_klass(string_klass::get_instance());
+}
+
 object *string::string_upper(vector<object *> *args) {
   auto arg_0 = args->at(0);
   auto str_obj = arg_0->as<string>();
@@ -120,4 +145,41 @@ object *string::string_upper(vector<object *> *args) {
                  ::toupper);
 
   return upper_str;
+}
+
+object *string::string_join(vector<object *> *args) {
+  auto arg_0 = args->at(0);
+  auto str_obj = arg_0->as<string>();
+  return str_obj->join(args->at(1));
+}
+
+string *string::join(object *iterable) {
+  auto iter = iterable->iter();
+  auto str = iter->next();
+
+  if (str == nullptr) {
+    return new string("");
+  }
+
+  size_t total = str->as<string>()->size();
+  while ((str = iter->next()) != nullptr) {
+    total += length;
+    total += str->as<string>()->size();
+  }
+
+  auto sz = new string{total};
+
+  iter = iterable->iter();
+  str = iter->next();
+  auto str_obj = str->as<string>();
+
+  auto i = std::copy(str_obj->begin(), str_obj->end(), sz->begin());
+
+  while ((str = iter->next()) != nullptr) {
+    str_obj = str->as<string>();
+    i = std::copy(begin(), end(), i);
+    i = std::copy(str_obj->begin(), str_obj->end(), i);
+  }
+
+  return sz;
 }

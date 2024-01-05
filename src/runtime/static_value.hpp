@@ -30,6 +30,8 @@ public:
   static inline vector<klass *> *klasses{nullptr};
 
   static inline code_object *main_code{nullptr};
+
+  static inline object *stop_iteration{nullptr};
 };
 
 struct value_equal {

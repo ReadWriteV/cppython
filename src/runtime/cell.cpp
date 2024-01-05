@@ -6,6 +6,11 @@
 
 using namespace cppython;
 
+cell_klass *cell_klass::get_instance() {
+  static cell_klass instance;
+  return &instance;
+}
+
 cell_klass::cell_klass() {
   set_dict(new dict{});
   set_name("cell");

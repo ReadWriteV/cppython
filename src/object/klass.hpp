@@ -60,9 +60,11 @@ public:
   virtual object *getattr(object *x, object *y);
   virtual object *setattr(object *x, object *y, object *z);
 
+  virtual object *get_klass_attr(object *x, object *y);
+
   virtual object *contains(object *x, object *y) { return nullptr; }
-  virtual object *iter(object *x) { return nullptr; }
-  virtual object *next(object *x) { return nullptr; }
+  virtual object *iter(object *x);
+  virtual object *next(object *x);
   virtual object *len(object *x);
   virtual object *call(vector<object *> *args) { return nullptr; }
   virtual object *allocate_instance(object *obj_type, vector<object *> *args);
