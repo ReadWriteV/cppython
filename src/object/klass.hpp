@@ -34,8 +34,8 @@ public:
   void set_name(std::string_view x) { name = x; }
   std::string get_name() const { return name; }
 
-  void set_dict(std::shared_ptr<dict> x) { map = x; }
-  std::shared_ptr<dict> get_dict() { return map; }
+  void set_dict(std::shared_ptr<dict> x) { attr = x; }
+  std::shared_ptr<dict> get_dict() { return attr; }
 
   static std::weak_ordering compare(klass *x, klass *y);
 
@@ -100,16 +100,15 @@ public:
                                           std::shared_ptr<object> y,
                                           std::shared_ptr<object> z);
 
+  virtual std::shared_ptr<object> get_klass_attr(std::shared_ptr<object> x,
+                                                 std::shared_ptr<object> y);
+
   virtual std::shared_ptr<object> contains(std::shared_ptr<object> x,
                                            std::shared_ptr<object> y) {
     return nullptr;
   }
-  virtual std::shared_ptr<object> iter(std::shared_ptr<object> x) {
-    return nullptr;
-  }
-  virtual std::shared_ptr<object> next(std::shared_ptr<object> x) {
-    return nullptr;
-  }
+  virtual std::shared_ptr<object> iter(std::shared_ptr<object> x);
+  virtual std::shared_ptr<object> next(std::shared_ptr<object> x);
   virtual std::shared_ptr<object> len(std::shared_ptr<object> x);
   virtual std::shared_ptr<object>
   call(std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
@@ -134,7 +133,7 @@ private:
   std::shared_ptr<type> type_object;
 
   std::string name;
-  std::shared_ptr<dict> map;
+  std::shared_ptr<dict> attr;
 };
 
 } // namespace cppython

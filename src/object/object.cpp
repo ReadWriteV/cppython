@@ -72,6 +72,10 @@ std::shared_ptr<object> cppython::object::setattr(std::shared_ptr<object> x,
   return get_klass()->setattr(shared_from_this(), x, y);
 }
 
+std::shared_ptr<object> object::get_klass_attr(std::shared_ptr<object> x) {
+  return get_klass()->get_klass_attr(shared_from_this(), x);
+}
+
 std::shared_ptr<object> object::subscr(std::shared_ptr<object> x) {
   return get_klass()->subscr(shared_from_this(), x);
 }

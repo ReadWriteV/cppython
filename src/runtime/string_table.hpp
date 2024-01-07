@@ -16,6 +16,10 @@ public:
   std::shared_ptr<string> add_str;
   std::shared_ptr<string> len_str;
   std::shared_ptr<string> call_str;
+  std::shared_ptr<string> name_str;
+  std::shared_ptr<string> iter_str;
+  std::shared_ptr<string> repr_str;
+
   std::shared_ptr<string> getitem_str;
   std::shared_ptr<string> setitem_str;
   std::shared_ptr<string> getattr_str;

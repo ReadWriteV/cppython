@@ -21,11 +21,7 @@ void klass::add_super(klass *x) {
 }
 
 std::shared_ptr<type> klass::get_super() {
-  if (super == nullptr) {
-    return nullptr;
-  }
-
-  if (super->empty()) {
+  if (super == nullptr || super->empty()) {
     return nullptr;
   }
 
@@ -94,6 +90,15 @@ std::weak_ordering klass::compare(klass *x, klass *y) {
 }
 
 std::string klass::to_string(std::shared_ptr<object> obj) {
+
+  auto repr_method =
+      get_klass_attr(obj, string_table::get_instance()->repr_str);
+  if (repr_method != static_value::none_value) {
+    return interpreter::get_instance()
+        ->call_virtual(repr_method, nullptr)
+        ->to_string();
+  }
+
   return std::format("<{} object at {:p}>",
                      obj->get_klass()->get_type_object()->get_type_name(),
                      static_cast<void *>(obj.get()));
@@ -139,13 +144,7 @@ std::shared_ptr<object> klass::getattr(std::shared_ptr<object> x,
     }
   }
 
-  auto result = find_in_parents(x, y);
-
-  if (method::is_function(result)) {
-    result =
-        std::make_shared<method>(std::static_pointer_cast<function>(result), x);
-  }
-  return result;
+  return get_klass_attr(x, y);
 }
 
 std::shared_ptr<object> klass::setattr(std::shared_ptr<object> x,
@@ -176,6 +175,26 @@ std::shared_ptr<object> klass::setattr(std::shared_ptr<object> x,
   return static_value::none_value;
 }
 
+std::shared_ptr<object> klass::get_klass_attr(std::shared_ptr<object> x,
+                                              std::shared_ptr<object> y) {
+  auto result = find_in_parents(x, y);
+  if (method::is_function(result)) {
+    // TODO: result maybe a native function, we will check it again, and cast it
+    // to native_function when invoke this method in build_frame
+    result =
+        std::make_shared<method>(std::static_pointer_cast<function>(result), x);
+  }
+  return result;
+}
+
+std::shared_ptr<object> klass::iter(std::shared_ptr<object> x) {
+  return find_and_call(x, nullptr, string_table::get_instance()->iter_str);
+}
+
+std::shared_ptr<object> klass::next(std::shared_ptr<object> x) {
+  return find_and_call(x, nullptr, string_table::get_instance()->next_str);
+}
+
 std::shared_ptr<object> klass::len(std::shared_ptr<object> x) {
   return find_and_call(x, nullptr, string_table::get_instance()->len_str);
 }
@@ -202,7 +221,8 @@ std::shared_ptr<object> klass::allocate_instance(
 
   inst->set_klass(type_obj->get_own_klass());
 
-  auto constructor = inst->getattr(string_table::get_instance()->init_str);
+  auto constructor =
+      inst->get_klass_attr(string_table::get_instance()->init_str);
   if (constructor != static_value::none_value) {
     interpreter::get_instance()->call_virtual(constructor, args);
   }
@@ -213,7 +233,7 @@ std::shared_ptr<object>
 klass::find_and_call(std::shared_ptr<object> x,
                      std::shared_ptr<std::vector<std::shared_ptr<object>>> args,
                      std::shared_ptr<string> func_name) {
-  auto func = x->getattr(func_name);
+  auto func = x->get_klass_attr(func_name);
   if (func != static_value::none_value) {
     return interpreter::get_instance()->call_virtual(func, args);
   }

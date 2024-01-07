@@ -41,6 +41,8 @@ public:
   std::shared_ptr<object> setattr(std::shared_ptr<object> x,
                                   std::shared_ptr<object> y);
 
+  std::shared_ptr<object> get_klass_attr(std::shared_ptr<object> x);
+
   std::shared_ptr<object> subscr(std::shared_ptr<object> x);
   void store_subscr(std::shared_ptr<object> x, std::shared_ptr<object> y);
   void del_subscr(std::shared_ptr<object> x);

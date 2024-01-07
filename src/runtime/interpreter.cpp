@@ -606,10 +606,10 @@ void interpreter::build_frame(
     auto obj = obj_type->get_own_klass()->allocate_instance(callable, args);
     push_data(obj);
   } else {
-    auto m = callable->getattr(string_table::get_instance()->call_str);
-    if (m != static_value::none_value)
+    auto m = callable->get_klass_attr(string_table::get_instance()->call_str);
+    if (m != static_value::none_value) {
       build_frame(m, args, real_arg_cnt, has_kw_arg);
-    else {
+    } else {
       std::println("Error : can not call a normal object <{}>.",
                    callable->to_string());
     }
