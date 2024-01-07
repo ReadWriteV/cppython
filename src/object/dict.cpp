@@ -126,10 +126,7 @@ bool dict::has_key(std::shared_ptr<object> k) {
 }
 
 std::shared_ptr<object> dict::at(std::shared_ptr<object> k) {
-  auto iter = std::find_if(value.begin(), value.end(), [&k](auto &&x) {
-    return x.first->equal(k) == static_value::true_value;
-  });
-  return iter == value.end() ? static_value::none_value : iter->second;
+  return get(k, value_equal{}).value_or(static_value::none_value);
 }
 
 std::shared_ptr<object> dict::remove(std::shared_ptr<object> k) {

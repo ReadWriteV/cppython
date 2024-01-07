@@ -14,6 +14,9 @@ public:
 
   std::string to_string(std::shared_ptr<object> obj) override;
 
+  std::shared_ptr<object> add(std::shared_ptr<object> x,
+                              std::shared_ptr<object> y) override;
+
   std::shared_ptr<object> equal(std::shared_ptr<object> x,
                                 std::shared_ptr<object> y) override;
   std::shared_ptr<object> less(std::shared_ptr<object> x,

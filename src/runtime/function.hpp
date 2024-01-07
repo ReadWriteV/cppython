@@ -42,6 +42,9 @@ std::shared_ptr<object>
 len(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
 
 std::shared_ptr<object>
+iter(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
+
+std::shared_ptr<object>
 print(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
 
 std::shared_ptr<object>
@@ -49,9 +52,6 @@ type_of(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
 
 std::shared_ptr<object>
 isinstance(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
-
-std::shared_ptr<object>
-builtin_super(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
 
 /// @brief build a class
 /// @param args first element is function object, second element is name, ...

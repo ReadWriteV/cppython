@@ -11,18 +11,11 @@ namespace cppython {
 class code_object;
 class object;
 class dict;
+class string;
+class Module;
 
 class interpreter : public singleton<interpreter> {
-public:
-  void run(std::shared_ptr<code_object> codes);
-
 private:
-  interpreter();
-
-  friend class singleton<interpreter>;
-  friend std::shared_ptr<object>
-  list_extend(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
-
   auto top_data() { return cur_frame->get_data_stack().top(); }
   void push_data(const std::shared_ptr<object> &v) {
     cur_frame->get_data_stack().push(v);
@@ -42,14 +35,20 @@ private:
   void leave_frame();
 
 public:
+  void initialize();
+  void run(std::shared_ptr<code_object> codes);
+
   std::shared_ptr<object>
   call_virtual(std::shared_ptr<object> func,
                std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
+  std::shared_ptr<dict> run_module(std::shared_ptr<code_object> codes,
+                                   std::shared_ptr<string> module_name);
 
 private:
   std::shared_ptr<frame> cur_frame;
   std::shared_ptr<object> ret_value;
 
-  std::shared_ptr<dict> builtins;
+  std::shared_ptr<Module> builtins;
+  std::shared_ptr<dict> modules;
 };
 } // namespace cppython

@@ -33,6 +33,17 @@ std::string string_klass::to_string(std::shared_ptr<object> obj) {
   return p->get_value();
 }
 
+std::shared_ptr<object> string_klass::add(std::shared_ptr<object> x,
+                                          std::shared_ptr<object> y) {
+  assert(x && (x->get_klass() == this));
+  auto p = std::static_pointer_cast<string>(x);
+
+  assert(y && (y->get_klass() == this));
+  auto q = std::static_pointer_cast<string>(y);
+
+  return std::make_shared<string>(p->get_value() + q->get_value());
+}
+
 std::shared_ptr<object> string_klass::equal(std::shared_ptr<object> x,
                                             std::shared_ptr<object> y) {
   if (x->get_klass() != y->get_klass()) {

@@ -6,6 +6,7 @@
 #include "utils/singleton.hpp"
 
 #include <concepts>
+#include <optional>
 #include <string>
 #include <unordered_map>
 
@@ -65,6 +66,21 @@ public:
 
   void insert(std::shared_ptr<object> k, std::shared_ptr<object> v) {
     insert_or_assign(k, v, value_equal{});
+  }
+
+  template <typename PredicateOperation>
+    requires std::predicate<PredicateOperation, const std::shared_ptr<object> &,
+                            const std::shared_ptr<object> &>
+  std::optional<std::shared_ptr<object>> get(std::shared_ptr<object> k,
+                                             PredicateOperation pred) {
+    auto iter = std::find_if(value.begin(), value.end(),
+                             [&](auto &&e) { return pred(e.first, k); });
+
+    if (iter == value.end()) {
+      return std::nullopt;
+    } else {
+      return iter->second;
+    }
   }
 
   std::shared_ptr<object> at(std::shared_ptr<object> k);

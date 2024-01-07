@@ -5,6 +5,8 @@
 #include "object/object.hpp"
 #include "object/string.hpp"
 #include "runtime/function.hpp"
+#include "runtime/interpreter.hpp"
+#include "runtime/module.hpp"
 
 using namespace cppython;
 
@@ -36,6 +38,7 @@ void static_value::create() {
   string_klass::get_instance()->initialize();
   list_klass::get_instance()->initialize();
   dict_klass::get_instance()->initialize();
+  module_klass::get_instance()->initialize();
 
   ty_klass->set_dict(std::make_shared<dict>());
   obj_klass->set_dict(std::make_shared<dict>());
@@ -53,6 +56,10 @@ void static_value::create() {
   function_klass::get_instance()->order_supers();
   native_function_klass::get_instance()->order_supers();
   method_klass::get_instance()->order_supers();
+
+  module_klass::get_instance()->order_supers();
+
+  interpreter::get_instance()->initialize();
 }
 
 void static_value::destroy() {}

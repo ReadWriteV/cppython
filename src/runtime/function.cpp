@@ -61,6 +61,12 @@ cppython::len(std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
 }
 
 std::shared_ptr<object>
+cppython::iter(std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
+  auto arg_0 = args->at(0);
+  return arg_0->len();
+}
+
+std::shared_ptr<object>
 cppython::print(std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
 
   for (auto &e : *args) {
@@ -93,11 +99,6 @@ std::shared_ptr<object> cppython::isinstance(
   }
 
   return static_value::false_value;
-}
-
-std::shared_ptr<object> cppython::builtin_super(
-    std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
-  return nullptr;
 }
 
 std::shared_ptr<object> cppython::build_class(

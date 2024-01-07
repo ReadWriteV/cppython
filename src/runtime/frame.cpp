@@ -19,9 +19,6 @@ frame::frame(std::shared_ptr<code_object> code) {
 
   locals = std::make_shared<dict>();
 
-  locals->insert(std::make_shared<string>("__name__"),
-                 std::make_shared<string>("__main__"));
-
   globals = locals;
 }
 

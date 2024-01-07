@@ -19,6 +19,8 @@ public:
   static std::shared_ptr<object> none_value;
 
   static std::shared_ptr<std::vector<klass *>> klasses;
+
+  static inline std::shared_ptr<object> stop_iteration{nullptr};
 };
 
 struct value_equal {

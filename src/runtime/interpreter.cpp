@@ -8,6 +8,7 @@
 #include "object/tuple.hpp"
 #include "runtime/cell.hpp"
 #include "runtime/function.hpp"
+#include "runtime/module.hpp"
 #include "runtime/static_value.hpp"
 #include "runtime/string_table.hpp"
 
@@ -18,8 +19,8 @@
 
 using namespace cppython;
 
-interpreter::interpreter() {
-  builtins = std::make_shared<dict>();
+void interpreter::initialize() {
+  builtins = std::make_shared<Module>(std::make_shared<dict>());
 
   // builtin values
   builtins->insert(std::make_shared<string>("True"), static_value::true_value);
@@ -32,12 +33,12 @@ interpreter::interpreter() {
                    std::make_shared<function>(print));
   builtins->insert(std::make_shared<string>("len"),
                    std::make_shared<function>(len));
+  builtins->insert(std::make_shared<string>("iter"),
+                   std::make_shared<function>(iter));
   builtins->insert(std::make_shared<string>("type"),
                    std::make_shared<function>(type_of));
   builtins->insert(std::make_shared<string>("isinstance"),
                    std::make_shared<function>(isinstance));
-  builtins->insert(std::make_shared<string>("builtin_super"),
-                   std::make_shared<function>(builtin_super));
 
   // builtin classes
   builtins->insert(std::make_shared<string>("object"),
@@ -50,10 +51,22 @@ interpreter::interpreter() {
                    list_klass::get_instance()->get_type_object());
   builtins->insert(std::make_shared<string>("dict"),
                    dict_klass::get_instance()->get_type_object());
+
+  builtins->extend(Module::import(std::make_shared<string>("builtin")));
+
+  static_value::stop_iteration =
+      builtins->get(std::make_shared<string>("StopIteration"));
+
+  modules = std::make_shared<dict>();
+  modules->insert(std::make_shared<string>("__builtins__"), builtins);
 }
 
 void interpreter::run(std::shared_ptr<code_object> codes) {
   cur_frame = std::make_shared<frame>(codes);
+
+  cur_frame->get_locals()->insert(string_table::get_instance()->name_str,
+                                  std::make_shared<string>("__main__"));
+
   eval_frame();
   destroy_frame();
 }
@@ -134,6 +147,13 @@ void interpreter::eval_frame() {
       auto v = pop_data();
       auto w = pop_data();
       push_data(w->div(v));
+      break;
+    }
+    case INPLACE_MODULO:
+    case BINARY_MODULO: {
+      auto v = pop_data();
+      auto w = pop_data();
+      push_data(w->mod(v));
       break;
     }
     case BINARY_SUBSCR: {
@@ -264,22 +284,14 @@ void interpreter::eval_frame() {
     case LOAD_NAME: {
       auto target_name = cur_frame->get_names()->at(op_arg);
 
-      auto map_finder = [&target_name](auto &&map) {
-        auto iter = std::find_if(
-            map->get_value().begin(), map->get_value().end(),
-            [&target_name](auto &&x) {
-              return x.first->equal(target_name) == static_value::true_value;
-            });
-        return iter == map->get_value().end()
-                   ? std::nullopt
-                   : std::make_optional(iter->second);
-      };
-
-      auto target_value =
-          map_finder(cur_frame->get_locals())
-              .or_else(std::bind(map_finder, cur_frame->get_globals()))
-              .or_else(std::bind(map_finder, builtins));
-      push_data(target_value.value_or(static_value::none_value));
+      auto target_value = cur_frame->get_locals()
+                              ->get(target_name, value_equal{})
+                              .or_else([this, &target_name]() {
+                                return cur_frame->get_globals()->get(
+                                    target_name, value_equal{});
+                              })
+                              .value_or(builtins->get(target_name));
+      push_data(target_value);
       break;
     }
     case BUILD_TUPLE: {
@@ -314,6 +326,26 @@ void interpreter::eval_frame() {
       push_data(v->getattr(w));
       break;
     }
+    case IMPORT_NAME: {
+      pop_data();
+      pop_data();
+      auto v = cur_frame->get_names()->at(op_arg);
+      auto w = modules->at(v);
+      if (w == static_value::none_value) {
+        w = Module::import(std::static_pointer_cast<string>(v));
+        modules->insert(v, w);
+      }
+      push_data(w);
+      break;
+    }
+    case IMPORT_FROM: {
+      auto v = cur_frame->get_names()->at(op_arg);
+      auto w = top_data();
+      auto u = std::static_pointer_cast<Module>(w)->get(v);
+      push_data(u);
+      break;
+    }
+
     case COMPARE_OP: {
       auto w = pop_data();
       auto v = pop_data();
@@ -363,20 +395,10 @@ void interpreter::eval_frame() {
     case LOAD_GLOBAL: {
       auto target_name = cur_frame->get_names()->at(op_arg);
 
-      auto map_finder = [&target_name](auto &&map) {
-        auto iter = std::find_if(
-            map->get_value().begin(), map->get_value().end(),
-            [&target_name](auto &&x) {
-              return x.first->equal(target_name) == static_value::true_value;
-            });
-        return iter == map->get_value().end()
-                   ? std::nullopt
-                   : std::make_optional(iter->second);
-      };
-
-      auto target_value = map_finder(cur_frame->get_globals())
-                              .or_else(std::bind(map_finder, builtins));
-      push_data(target_value.value_or(static_value::none_value));
+      auto target_value = cur_frame->get_globals()
+                              ->get(target_name, value_equal{})
+                              .value_or(builtins->get(target_name));
+      push_data(target_value);
 
       break;
     }
@@ -652,4 +674,19 @@ std::shared_ptr<object> interpreter::call_virtual(
     return ret_value;
   }
   return static_value::none_value;
+}
+
+std::shared_ptr<dict>
+interpreter::run_module(std::shared_ptr<code_object> codes,
+                        std::shared_ptr<string> module_name) {
+  auto module_frame = std::make_shared<frame>(codes);
+  module_frame->set_entry_frame(true);
+  module_frame->get_locals()->insert(string_table::get_instance()->name_str,
+                                     module_name);
+
+  enter_frame(module_frame);
+  eval_frame();
+  auto result = module_frame->get_locals();
+  destroy_frame();
+  return result;
 }
