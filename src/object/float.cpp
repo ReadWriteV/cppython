@@ -126,7 +126,7 @@ std::shared_ptr<object> float_klass::allocate_instance(
     std::shared_ptr<object> obj_type,
     std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
   if (!args || args->size() == 0) {
-    return std::make_shared<float_num>(0);
+    return std::make_shared<float_num>(0.);
   } else {
     return nullptr;
   }

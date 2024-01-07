@@ -2,15 +2,18 @@
 #include "code/bytecode.hpp"
 #include "code/code_object.hpp"
 #include "object/dict.hpp"
+#include "object/float.hpp"
 #include "object/integer.hpp"
 #include "object/list.hpp"
 #include "object/object.hpp"
 #include "object/tuple.hpp"
 #include "runtime/cell.hpp"
 #include "runtime/function.hpp"
+#include "runtime/generator.hpp"
 #include "runtime/module.hpp"
 #include "runtime/static_value.hpp"
 #include "runtime/string_table.hpp"
+#include "runtime/traceback.hpp"
 
 #include <cassert>
 #include <functional>
@@ -45,6 +48,8 @@ void interpreter::initialize() {
                    object_klass::get_instance()->get_type_object());
   builtins->insert(std::make_shared<string>("int"),
                    integer_klass::get_instance()->get_type_object());
+  builtins->insert(std::make_shared<string>("float"),
+                   float_klass::get_instance()->get_type_object());
   builtins->insert(std::make_shared<string>("str"),
                    string_klass::get_instance()->get_type_object());
   builtins->insert(std::make_shared<string>("list"),
@@ -68,7 +73,34 @@ void interpreter::run(std::shared_ptr<code_object> codes) {
                                   std::make_shared<string>("__main__"));
 
   eval_frame();
+
+  if (cur_status == status::is_exception) {
+    cur_status = status::is_ok;
+
+    std::print("{}", trace_back->to_string());
+    std::println("Exception: {}", pending_exception->to_string());
+
+    trace_back = nullptr;
+    pending_exception = nullptr;
+    exception_class = nullptr;
+  }
+
   destroy_frame();
+}
+
+std::shared_ptr<dict>
+interpreter::run_module(std::shared_ptr<code_object> codes,
+                        std::shared_ptr<string> module_name) {
+  auto module_frame = std::make_shared<frame>(codes);
+  module_frame->set_entry_frame(true);
+  module_frame->get_locals()->insert(string_table::get_instance()->name_str,
+                                     module_name);
+
+  enter_frame(module_frame);
+  eval_frame();
+  auto result = module_frame->get_locals();
+  destroy_frame();
+  return result;
 }
 
 void interpreter::eval_frame() {
@@ -121,6 +153,13 @@ void interpreter::eval_frame() {
       push_data(x);
       break;
     }
+    case INPLACE_MODULO:
+    case BINARY_MODULO: {
+      auto v = pop_data();
+      auto w = pop_data();
+      push_data(w->mod(v));
+      break;
+    }
     case INPLACE_ADD:
     case BINARY_ADD: {
       auto v = pop_data();
@@ -147,13 +186,6 @@ void interpreter::eval_frame() {
       auto v = pop_data();
       auto w = pop_data();
       push_data(w->div(v));
-      break;
-    }
-    case INPLACE_MODULO:
-    case BINARY_MODULO: {
-      auto v = pop_data();
-      auto w = pop_data();
-      push_data(w->mod(v));
       break;
     }
     case BINARY_SUBSCR: {
@@ -203,15 +235,17 @@ void interpreter::eval_frame() {
       break;
     }
     case FOR_ITER: {
-      auto v = cur_frame->get_data_stack().top();
+      auto v = top_data();
+      auto w = v->next();
 
-      auto w = v->getattr(string_table::get_instance()->next_str);
-
-      build_frame(w, nullptr);
-
-      if (cur_frame->get_data_stack().top() == nullptr) {
+      if (w == nullptr) {
+        // assert(cur_status == status::is_exception &&
+        //        pending_exception == static_value::stop_iteration);
         cur_frame->set_pc(cur_frame->get_pc() + op_arg);
-        cur_frame->get_data_stack().pop();
+        cur_status = status::is_ok;
+        pending_exception = nullptr;
+      } else {
+        push_data(w);
       }
       break;
     }
@@ -226,28 +260,21 @@ void interpreter::eval_frame() {
       break;
     }
 
-    case BREAK_LOOP:
-      while (!cur_frame->get_data_stack().empty() &&
-             cur_frame->get_data_stack().size() >
-                 cur_frame->get_loop_stack().top().level) {
-        cur_frame->get_data_stack().pop();
-      }
-      cur_frame->set_pc(cur_frame->get_loop_stack().top().target);
-      cur_frame->get_loop_stack().pop();
-      break;
-
     case LOAD_LOCALS:
       push_data(cur_frame->get_locals());
       break;
 
     case RETURN_VALUE: {
       ret_value = pop_data();
-      if (cur_frame->is_first_frame() || cur_frame->is_entry_frame()) {
-        return;
-      }
-      leave_frame();
+      cur_status = status::is_return;
       break;
     }
+    case YIELD_VALUE:
+      // we are assured that we're in the progress
+      // of evalating generator.
+      cur_status = status::is_yield;
+      ret_value = top_data();
+      return;
 
     case POP_BLOCK:
       while (!cur_frame->get_data_stack().empty() &&
@@ -263,6 +290,21 @@ void interpreter::eval_frame() {
       cur_frame->get_locals()->insert(v, pop_data());
       break;
     }
+    case POP_EXCEPT:
+      // while (!cur_frame->get_data_stack()->empty() &&
+      //        cur_frame->get_data_stack()->size() >
+      //            cur_frame->get_loop_stack().top().level) {
+      //   pop_data();
+      // }
+      // cur_frame->get_loop_stack().pop();
+      break;
+
+    case DELETE_NAME: {
+      auto v = cur_frame->get_names()->at(op_arg);
+      cur_frame->get_locals()->remove(v);
+      break;
+    }
+
     case STORE_ATTR: {
       auto u = pop_data();
       auto v = cur_frame->get_names()->at(op_arg);
@@ -410,6 +452,34 @@ void interpreter::eval_frame() {
       break;
     }
 
+    case JUMP_IF_NOT_EXC_MATCH: {
+      auto u = pop_data(); // TOS
+      auto v = pop_data(); // the second value
+
+      bool match = false;
+      auto mro_lst = std::static_pointer_cast<type>(v)
+                         ->get_own_klass()
+                         ->get_mro()
+                         ->get_value();
+
+      if (v == u) {
+        match = true;
+      } else {
+        match = std::find(mro_lst.begin(), mro_lst.end(), u) != mro_lst.end();
+      }
+
+      if (!match) {
+        cur_frame->set_pc(op_arg);
+      }
+
+      break;
+    }
+
+    case SETUP_FINALLY:
+      cur_frame->get_loop_stack().push({op_code, cur_frame->get_pc() + op_arg,
+                                        cur_frame->get_data_stack().size()});
+      break;
+
     case LOAD_FAST:
       push_data(cur_frame->get_fast_locals()->at(op_arg));
       break;
@@ -417,7 +487,34 @@ void interpreter::eval_frame() {
     case STORE_FAST:
       cur_frame->get_fast_locals()->set_at(op_arg, pop_data());
       break;
-
+    case RAISE_VARARGS: {
+      switch (op_arg) {
+      case 0: // raise (re-raise previous exception)
+        // auto u = pop_data();
+        // w = pending_exception;
+        assert(false && "raise (re-raise previous exception)");
+        break;
+      case 1: // raise TOS (raise exception instance or type at TOS)
+      {
+        auto u = pop_data();
+        if (u->get_klass() == type_klass::get_instance()) {
+          do_raise(u, nullptr, nullptr);
+        } else {
+          do_raise(u->get_klass()->get_type_object(), u, nullptr);
+        }
+        break;
+      }
+      case 2: // raise TOS1 from TOS (raise exception instance or type at TOS1
+              // with __cause__ set to TOS)
+      {
+        auto u = pop_data();
+        auto w = pop_data();
+        assert(false && "raise TOS1 from TOS");
+        break;
+      }
+      }
+      break;
+    }
     case CALL_FUNCTION: {
       std::shared_ptr<std::vector<std::shared_ptr<object>>> args;
       if (op_arg > 0) {
@@ -587,6 +684,55 @@ void interpreter::eval_frame() {
     default:
       std::println("Error: Unrecognized byte code {:#04x}", op_code);
     }
+
+    while (cur_status != status::is_ok &&
+           cur_frame->get_loop_stack().size() != 0) {
+
+      auto b = cur_frame->get_loop_stack().top();
+      cur_frame->get_loop_stack().pop();
+
+      while (cur_frame->get_data_stack().size() > b.level) {
+        pop_data();
+      }
+
+      if (b.type == std::to_underlying(bytecode::SETUP_FINALLY) ||
+          cur_status == status::is_exception) {
+        if (cur_status == status::is_exception) {
+          // traceback, value, exception class
+          push_data(trace_back);
+          push_data(pending_exception);
+          push_data(exception_class);
+
+          trace_back = nullptr;
+          pending_exception = nullptr;
+          exception_class = nullptr;
+
+        } else {
+          if (cur_status == status::is_return) {
+            push_data(ret_value);
+          }
+        }
+        cur_frame->set_pc(b.target);
+        cur_status = status::is_ok;
+      }
+    }
+    // has pending exception and no handler found, unwind stack.
+    if (cur_status != status::is_ok &&
+        cur_frame->get_loop_stack().size() == 0) {
+      if (cur_status == status::is_exception) {
+        ret_value = nullptr;
+        std::static_pointer_cast<traceback>(trace_back)
+            ->record_frame(cur_frame);
+      }
+      if (cur_status == status::is_return) {
+        cur_status = status::is_ok;
+      }
+
+      if (cur_frame->is_first_frame() || cur_frame->is_entry_frame()) {
+        return;
+      }
+      leave_frame();
+    }
   }
 }
 
@@ -618,6 +764,11 @@ void interpreter::build_frame(
     }
     args->insert(args->begin(), method_obj->get_owner());
     build_frame(method_obj->get_func(), args, real_arg_cnt + 1, has_kw_arg);
+  } else if (method::is_yield_function(callable)) {
+    auto g = std::make_shared<Generator>(
+        std::static_pointer_cast<function>(callable), args, real_arg_cnt);
+    push_data(g);
+    return;
   } else if (callable->get_klass() == function_klass::get_instance()) {
     auto func = std::static_pointer_cast<function>(callable);
     auto new_frame =
@@ -676,17 +827,51 @@ std::shared_ptr<object> interpreter::call_virtual(
   return static_value::none_value;
 }
 
-std::shared_ptr<dict>
-interpreter::run_module(std::shared_ptr<code_object> codes,
-                        std::shared_ptr<string> module_name) {
-  auto module_frame = std::make_shared<frame>(codes);
-  module_frame->set_entry_frame(true);
-  module_frame->get_locals()->insert(string_table::get_instance()->name_str,
-                                     module_name);
+interpreter::status interpreter::do_raise(std::shared_ptr<object> exc,
+                                          std::shared_ptr<object> val,
+                                          std::shared_ptr<object> tb) {
 
-  enter_frame(module_frame);
+  assert(exc != nullptr);
+
+  cur_status = status::is_exception;
+
+  if (tb == nullptr) {
+    tb = std::make_shared<traceback>();
+  }
+
+  if (val != nullptr) {
+    exception_class = exc;
+    pending_exception = val;
+    trace_back = tb;
+    return status::is_exception;
+  }
+
+  if (exc->get_klass() == type_klass::get_instance()) {
+    exception_class = exc;
+    pending_exception = call_virtual(exc, nullptr);
+  } else {
+    pending_exception = exc;
+    exception_class = pending_exception->get_klass()->get_type_object();
+  }
+  trace_back = tb;
+  return status::is_exception;
+}
+
+std::shared_ptr<object>
+interpreter::eval_generator(std::shared_ptr<Generator> g) {
+  enter_frame(g->get_frame());
+  g->get_frame()->set_entry_frame(true);
   eval_frame();
-  auto result = module_frame->get_locals();
-  destroy_frame();
-  return result;
+
+  if (cur_status != status::is_yield) { // return from generator
+    cur_status = status::is_ok;
+    leave_frame();
+    g->set_frame(nullptr);
+    return nullptr;
+  }
+
+  cur_status = status::is_ok;
+  cur_frame = cur_frame->get_caller();
+
+  return ret_value;
 }

@@ -16,9 +16,9 @@ using namespace cppython;
 constexpr int flag_ref = 0x80;
 
 std::shared_ptr<code_object> pyc_parser::parse() {
-  auto magic_number = reader.read<int>();
+  const auto magic_number = reader.read<int>();
 
-  auto bit_field = reader.read<int>();
+  const auto bit_field = reader.read<int>();
 
   const time_t mod_date = reader.read<int>();
   const auto time = std::chrono::system_clock::from_time_t(mod_date);
@@ -75,7 +75,7 @@ std::shared_ptr<object> pyc_parser::parse_object() {
     assert(false);
     break;
   }
-  return std::shared_ptr<object>();
+  return nullptr;
 }
 
 std::shared_ptr<code_object> pyc_parser::get_code_object(bool ref_flag) {
