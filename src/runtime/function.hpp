@@ -125,6 +125,7 @@ public:
   auto get_func() { return func; }
 
   static bool is_function(std::shared_ptr<object> x);
+  static bool is_yield_function(std::shared_ptr<object> x);
 
 private:
   std::shared_ptr<object> owner;

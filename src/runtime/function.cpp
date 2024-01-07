@@ -151,3 +151,12 @@ bool method::is_function(std::shared_ptr<object> x) {
     return e == function_klass::get_instance()->get_type_object();
   });
 }
+
+bool method::is_yield_function(std::shared_ptr<object> x) {
+  if (x->get_klass() != function_klass::get_instance()) {
+    return false;
+  }
+
+  auto fo = std::static_pointer_cast<function>(x);
+  return (fo->get_flags() & function::generator) != 0;
+}
