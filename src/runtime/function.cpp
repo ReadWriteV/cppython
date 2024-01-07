@@ -3,6 +3,7 @@
 #include "object/dict.hpp"
 #include "object/integer.hpp"
 #include "object/list.hpp"
+#include "object/string.hpp"
 #include "runtime/interpreter.hpp"
 #include "runtime/static_value.hpp"
 

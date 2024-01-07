@@ -4,6 +4,12 @@
 
 using namespace cppython;
 
+code_klass::code_klass() {
+  set_name("code");
+  add_super(object_klass::get_instance());
+  set_type_object(std::make_shared<type>());
+}
+
 std::string code_klass::to_string(std::shared_ptr<object> obj) {
   auto p = std::static_pointer_cast<code_object>(obj);
   assert(p && (p->get_klass() == this));

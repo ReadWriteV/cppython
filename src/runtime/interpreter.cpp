@@ -5,6 +5,7 @@
 #include "object/integer.hpp"
 #include "object/list.hpp"
 #include "object/object.hpp"
+#include "object/tuple.hpp"
 #include "runtime/cell.hpp"
 #include "runtime/function.hpp"
 #include "runtime/static_value.hpp"
