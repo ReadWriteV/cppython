@@ -50,6 +50,7 @@ public:
   std::shared_ptr<object> contains(std::shared_ptr<object> x);
 
   std::shared_ptr<object> iter();
+  std::shared_ptr<object> next();
   std::shared_ptr<object> len();
 
 private:

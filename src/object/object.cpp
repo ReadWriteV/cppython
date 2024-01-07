@@ -97,6 +97,10 @@ std::shared_ptr<object> object::iter() {
   return get_klass()->iter(shared_from_this());
 }
 
+std::shared_ptr<object> object::next() {
+  return get_klass()->next(shared_from_this());
+}
+
 std::shared_ptr<object> object::len() {
   return get_klass()->len(shared_from_this());
 }
