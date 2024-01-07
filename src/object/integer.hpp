@@ -4,6 +4,7 @@
 #include "object/object.hpp"
 #include "utils/singleton.hpp"
 
+#include <concepts>
 #include <memory>
 
 namespace cppython {

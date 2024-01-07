@@ -4,9 +4,7 @@
 
 #include <cassert>
 #include <compare>
-#include <concepts>
 #include <functional>
-#include <print>
 
 using namespace cppython;
 
