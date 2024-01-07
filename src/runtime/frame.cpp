@@ -87,13 +87,13 @@ frame::frame(std::shared_ptr<function> func,
         kw_args->insert(k, v);
       }
     }
+  }
 
-    if (codes->flags & function::co_flags::var_args) {
-      fast_locals->append(var_args);
-    }
-    if (codes->flags & function::co_flags::var_keywords) {
-      fast_locals->append(kw_args);
-    }
+  if (codes->flags & function::co_flags::var_args) {
+    fast_locals->append(var_args);
+  }
+  if (codes->flags & function::co_flags::var_keywords) {
+    fast_locals->append(kw_args);
   }
 
   auto cells = codes->cellvars;
