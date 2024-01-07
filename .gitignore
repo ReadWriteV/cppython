@@ -5,7 +5,7 @@
 build/
 
 # pyc Code
-test/__pycache__/
+__pycache__/
 
 # lib Directory
-lib/
+/lib/
