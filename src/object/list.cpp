@@ -27,7 +27,7 @@ void list_klass::initialize() {
               std::make_shared<function>(list::list_reverse));
   map->insert(std::make_shared<string>("sort"),
               std::make_shared<function>(list::list_sort));
-  map->insert(std::make_shared<string>("sort"),
+  map->insert(std::make_shared<string>("extend"),
               std::make_shared<function>(list::list_extend));
   map->insert(std::make_shared<string>("__getitem__"),
               std::make_shared<function>(list::list_getitem));

@@ -36,7 +36,7 @@ interpreter::interpreter() {
                    std::make_shared<function>(type_of));
   builtins->insert(std::make_shared<string>("isinstance"),
                    std::make_shared<function>(isinstance));
-  builtins->insert(std::make_shared<string>("type"),
+  builtins->insert(std::make_shared<string>("builtin_super"),
                    std::make_shared<function>(builtin_super));
 
   // builtin classes
