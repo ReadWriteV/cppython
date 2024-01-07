@@ -12,6 +12,7 @@ class tuple;
 class dict;
 class function;
 class code_object;
+class string;
 
 struct loop_block {
   unsigned char type;
@@ -45,6 +46,10 @@ public:
   auto &get_fast_locals() { return fast_locals; }
   auto &get_closure() { return closure; }
   std::shared_ptr<object> get_cell_from_parameter(int i);
+
+  std::shared_ptr<string> get_file_name();
+  std::shared_ptr<string> get_func_name();
+  int get_source_lineno();
 
   bool has_more_codes() const;
   unsigned char get_op_code();

@@ -129,11 +129,35 @@ std::shared_ptr<object> frame::get_cell_from_parameter(int i) {
   assert(vars && vars->get_klass() == tuple_klass::get_instance());
   auto tpl_vars = std::static_pointer_cast<tuple>(vars);
 
-  auto iter = std::ranges::find_if(
-      tpl_vars->get_value(),
-      [t = cell_name](const std::shared_ptr<cppython::object> &x) {
-        return x->equal(t) == static_value::true_value;
-      });
+  auto iter = std::ranges::find_if(tpl_vars->get_value(),
+                                   std::bind_back(value_equal{}, cell_name));
   assert(iter != tpl_vars->get_value().end());
   return fast_locals->at(std::distance(tpl_vars->get_value().begin(), iter));
+}
+
+std::shared_ptr<string> frame::get_file_name() {
+  return std::static_pointer_cast<string>(codes->filename);
+}
+
+std::shared_ptr<string> frame::get_func_name() {
+  return std::static_pointer_cast<string>(codes->name);
+}
+
+int frame::get_source_lineno() {
+  int pc_offset = 0;
+  int src_line_no = codes->firstlineno;
+
+  auto lnotab = std::static_pointer_cast<string>(codes->lnotab);
+  int length = lnotab->size();
+
+  for (int i = 0; i < length; i++) {
+    pc_offset += lnotab->at(i++);
+    if (pc_offset >= pc) {
+      return src_line_no;
+    }
+
+    src_line_no += lnotab->at(i);
+  }
+
+  return src_line_no;
 }
