@@ -7,7 +7,7 @@ using namespace cppython;
 code_klass::code_klass() {
   set_name("code");
   add_super(object_klass::get_instance());
-  set_type_object(std::make_shared<type>());
+  std::make_shared<type>()->set_own_klass(this);
 }
 
 std::string code_klass::to_string(std::shared_ptr<object> obj) {
