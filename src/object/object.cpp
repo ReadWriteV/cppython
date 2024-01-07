@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <format>
 
 using namespace cppython;
 
@@ -109,9 +110,7 @@ std::string type_klass::to_string(std::shared_ptr<object> obj) {
   assert(obj->get_klass() == this);
   auto type_obj = std::static_pointer_cast<type>(obj);
 
-  std::string result;
-  result += "<class '" + type_obj->get_type_name() + "\'>";
-  return result;
+  return std::format("<class '{}'>", type_obj->get_type_name());
 }
 
 std::shared_ptr<object> type_klass::setattr(std::shared_ptr<object> x,
