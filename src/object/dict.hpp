@@ -2,8 +2,11 @@
 
 #include "object/klass.hpp"
 #include "object/object.hpp"
+#include "runtime/static_value.hpp"
 #include "utils/singleton.hpp"
 
+#include <concepts>
+#include <functional>
 #include <string>
 #include <unordered_map>
 
@@ -45,9 +48,26 @@ public:
   auto size() { return value.size(); }
 
   bool has_key(std::shared_ptr<object> k);
-  void insert(std::shared_ptr<object> k, std::shared_ptr<object> v) {
-    value.insert_or_assign(k, v);
+
+  template <typename PredicateOperation>
+    requires std::predicate<PredicateOperation, const std::shared_ptr<object> &,
+                            const std::shared_ptr<object> &>
+  void insert_or_assign(std::shared_ptr<object> k, std::shared_ptr<object> v,
+                        PredicateOperation pred) {
+    auto iter = std::find_if(value.begin(), value.end(),
+                             [&](auto &&e) { return pred(e.first, k); });
+
+    if (iter == value.end()) {
+      value.insert({k, v});
+    } else {
+      iter->second = v;
+    }
   }
+
+  void insert(std::shared_ptr<object> k, std::shared_ptr<object> v) {
+    insert_or_assign(k, v, value_equal{});
+  }
+
   std::shared_ptr<object> at(std::shared_ptr<object> k);
   std::shared_ptr<object> remove(std::shared_ptr<object> k);
 

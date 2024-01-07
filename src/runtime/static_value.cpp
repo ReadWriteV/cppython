@@ -60,3 +60,13 @@ void static_value::destroy() {}
 std::shared_ptr<object> static_value::get_bool_value(bool v) {
   return v ? true_value : false_value;
 }
+
+bool value_equal::operator()(const std::shared_ptr<object> &lhs,
+                             const std::shared_ptr<object> &rhs) const {
+  return lhs->equal(rhs) == static_value::true_value;
+}
+
+bool value_less::operator()(const std::shared_ptr<object> &lhs,
+                            const std::shared_ptr<object> &rhs) const {
+  return lhs->less(rhs) == static_value::true_value;
+}

@@ -20,4 +20,14 @@ public:
 
   static std::shared_ptr<std::vector<klass *>> klasses;
 };
+
+struct value_equal {
+  [[nodiscard]] bool operator()(const std::shared_ptr<object> &lhs,
+                                const std::shared_ptr<object> &rhs) const;
+};
+
+struct value_less {
+  [[nodiscard]] bool operator()(const std::shared_ptr<object> &lhs,
+                                const std::shared_ptr<object> &rhs) const;
+};
 } // namespace cppython
