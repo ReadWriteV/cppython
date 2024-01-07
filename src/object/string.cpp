@@ -16,6 +16,8 @@ void string_klass::initialize() {
 
   string_dict->insert(std::make_shared<string>("upper"),
                       std::make_shared<function>(string::string_upper));
+  string_dict->insert(std::make_shared<string>("join"),
+                      std::make_shared<function>(string::string_join));
 
   set_dict(string_dict);
 
@@ -107,6 +109,40 @@ std::shared_ptr<object> string_klass::allocate_instance(
   }
 }
 
+std::shared_ptr<string> string::join(std::shared_ptr<object> iterable) {
+  auto iter = iterable->iter();
+  auto obj = iter->next();
+
+  if (obj == nullptr) {
+    return std::make_shared<string>("");
+  }
+  auto str = std::static_pointer_cast<string>(obj);
+  size_t total = str->size();
+  while ((obj = iter->next()) != nullptr) {
+    total += this->size();
+    str = std::static_pointer_cast<string>(obj);
+    total += str->size();
+  }
+
+  std::string result;
+  result.resize(total);
+
+  iter = iterable->iter();
+  obj = iter->next();
+  str = std::static_pointer_cast<string>(obj);
+
+  auto i = std::copy(str->get_value().begin(), str->get_value().end(),
+                     result.begin());
+
+  while ((obj = iter->next()) != nullptr) {
+    str = std::static_pointer_cast<string>(obj);
+    i = std::copy(value.begin(), value.end(), i);
+    i = std::copy(str->get_value().begin(), str->get_value().end(), i);
+  }
+
+  return std::make_shared<string>(std::move(result));
+}
+
 std::shared_ptr<object> string::string_upper(
     std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
   auto arg_0 = args->at(0);
@@ -126,4 +162,13 @@ std::shared_ptr<object> string::string_upper(
                  upper_str.begin(), ::toupper);
 
   return std::make_shared<string>(std::move(upper_str));
+}
+
+std::shared_ptr<object> string::string_join(
+    std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
+  auto arg_0 = args->at(0);
+  assert(arg_0->get_klass() == string_klass::get_instance());
+
+  auto str_obj = std::static_pointer_cast<string>(arg_0);
+  return str_obj->join(args->at(1));
 }
