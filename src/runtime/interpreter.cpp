@@ -10,7 +10,6 @@
 #include "runtime/static_value.hpp"
 #include "runtime/string_table.hpp"
 
-#include "interpreter.hpp"
 #include <cassert>
 #include <functional>
 #include <optional>
@@ -62,29 +61,31 @@ void interpreter::eval_frame() {
 
   while (cur_frame->has_more_codes()) {
     auto op_code = cur_frame->get_op_code();
-    bool has_argument = (op_code & 0xFF) >= bytecode::HAVE_ARGUMENT;
+    bool has_argument =
+        (op_code & 0xFF) >= std::to_underlying(bytecode::HAVE_ARGUMENT);
 
     int op_arg = -1;
     if (has_argument) {
       op_arg = cur_frame->get_op_arg();
     }
 
-    switch (op_code) {
-    case bytecode::NOP:
+    switch (auto op = static_cast<bytecode>(op_code); op) {
+      using enum bytecode;
+    case NOP:
       break;
 
-    case bytecode::POP_TOP:
+    case POP_TOP:
       pop_data();
       break;
 
-    case bytecode::ROT_TWO: {
+    case ROT_TWO: {
       auto x = pop_data();
       auto y = pop_data();
       push_data(x);
       push_data(y);
       break;
     }
-    case bytecode::ROT_THREE: {
+    case ROT_THREE: {
       auto x = pop_data();
       auto y = pop_data();
       auto z = pop_data();
@@ -93,11 +94,11 @@ void interpreter::eval_frame() {
       push_data(y);
       break;
     }
-    case bytecode::DUP_TOP: {
+    case DUP_TOP: {
       push_data(top_data());
       break;
     }
-    case bytecode::DUP_TOP_TWO: {
+    case DUP_TOP_TWO: {
       auto x = pop_data();
       auto y = pop_data();
       push_data(y);
@@ -106,33 +107,41 @@ void interpreter::eval_frame() {
       push_data(x);
       break;
     }
-    case bytecode::INPLACE_ADD: {
-    case bytecode::BINARY_ADD: {
+    case INPLACE_ADD:
+    case BINARY_ADD: {
       auto v = pop_data();
       auto w = pop_data();
       push_data(w->add(v));
       break;
     }
-    case bytecode::BINARY_SUBTRACT: {
+    case INPLACE_SUBTRACT:
+    case BINARY_SUBTRACT: {
       auto v = pop_data();
       auto w = pop_data();
       push_data(w->sub(v));
       break;
     }
-    case bytecode::BINARY_MULTIPLY: {
+    case INPLACE_MULTIPLY:
+    case BINARY_MULTIPLY: {
       auto v = pop_data();
       auto w = pop_data();
       push_data(w->mul(v));
       break;
     }
-
-    case bytecode::BINARY_SUBSCR: {
+    case INPLACE_DIVIDE:
+    case BINARY_DIVIDE: {
+      auto v = pop_data();
+      auto w = pop_data();
+      push_data(w->div(v));
+      break;
+    }
+    case BINARY_SUBSCR: {
       auto v = pop_data();
       auto w = pop_data();
       push_data(w->subscr(v));
       break;
     }
-    case bytecode::STORE_MAP: {
+    case STORE_MAP: {
       auto k = pop_data();
       auto v = pop_data();
       auto m = pop_data();
@@ -140,39 +149,39 @@ void interpreter::eval_frame() {
       break;
     }
 
-    case bytecode::STORE_SUBSCR: {
+    case STORE_SUBSCR: {
       auto u = pop_data();
       auto v = pop_data();
       auto w = pop_data();
       v->store_subscr(u, w);
       break;
     }
-    case bytecode::DELETE_SUBSCR: {
+    case DELETE_SUBSCR: {
       auto v = pop_data();
       auto w = pop_data();
       w->del_subscr(v);
       break;
     }
 
-    case bytecode::GET_ITER: {
+    case GET_ITER: {
       auto v = pop_data();
       push_data(v->iter());
       break;
     }
 
-    case bytecode::LOAD_BUILD_CLASS: {
+    case LOAD_BUILD_CLASS: {
       push_data(std::make_shared<function>(cppython::build_class));
       break;
     }
 
-    case bytecode::UNPACK_SEQUENCE: {
+    case UNPACK_SEQUENCE: {
       auto v = pop_data();
       while (op_arg--) {
         push_data(v->subscr(std::make_shared<integer>(op_arg)));
       }
       break;
     }
-    case bytecode::FOR_ITER: {
+    case FOR_ITER: {
       auto v = cur_frame->get_data_stack().top();
 
       auto w = v->getattr(string_table::get_instance()->next_str);
@@ -185,7 +194,7 @@ void interpreter::eval_frame() {
       }
       break;
     }
-    case bytecode::IS_OP: {
+    case IS_OP: {
       auto v = pop_data();
       auto w = pop_data();
       if (v == w) {
@@ -196,7 +205,7 @@ void interpreter::eval_frame() {
       break;
     }
 
-    case bytecode::BREAK_LOOP:
+    case BREAK_LOOP:
       while (!cur_frame->get_data_stack().empty() &&
              cur_frame->get_data_stack().size() >
                  cur_frame->get_loop_stack().top().level) {
@@ -206,11 +215,11 @@ void interpreter::eval_frame() {
       cur_frame->get_loop_stack().pop();
       break;
 
-    case bytecode::LOAD_LOCALS:
+    case LOAD_LOCALS:
       push_data(cur_frame->get_locals());
       break;
 
-    case bytecode::RETURN_VALUE: {
+    case RETURN_VALUE: {
       ret_value = pop_data();
       if (cur_frame->is_first_frame() || cur_frame->is_entry_frame()) {
         return;
@@ -219,7 +228,7 @@ void interpreter::eval_frame() {
       break;
     }
 
-    case bytecode::POP_BLOCK:
+    case POP_BLOCK:
       while (!cur_frame->get_data_stack().empty() &&
              cur_frame->get_data_stack().size() >
                  cur_frame->get_loop_stack().top().level) {
@@ -228,30 +237,30 @@ void interpreter::eval_frame() {
       cur_frame->get_loop_stack().pop();
       break;
 
-    case bytecode::STORE_NAME: {
+    case STORE_NAME: {
       auto v = cur_frame->get_names()->at(op_arg);
       cur_frame->get_locals()->insert(v, pop_data());
       break;
     }
-    case bytecode::STORE_ATTR: {
+    case STORE_ATTR: {
       auto u = pop_data();
       auto v = cur_frame->get_names()->at(op_arg);
       auto w = pop_data();
       u->setattr(v, w);
       break;
     }
-    case bytecode::STORE_GLOBAL: {
+    case STORE_GLOBAL: {
       auto v = cur_frame->get_names()->at(op_arg);
       cur_frame->get_globals()->insert(v, pop_data());
       break;
     }
 
-    case bytecode::LOAD_CONST:
+    case LOAD_CONST:
       push_data(cur_frame->get_consts()->at(op_arg));
       break;
 
     // Local, Enclosing, Global, Builtin
-    case bytecode::LOAD_NAME: {
+    case LOAD_NAME: {
       auto target_name = cur_frame->get_names()->at(op_arg);
 
       auto map_finder = [&target_name](auto &&map) {
@@ -272,7 +281,7 @@ void interpreter::eval_frame() {
       push_data(target_value.value_or(static_value::none_value));
       break;
     }
-    case bytecode::BUILD_TUPLE: {
+    case BUILD_TUPLE: {
       std::vector<std::shared_ptr<object>> tmp;
       tmp.resize(op_arg);
 
@@ -282,7 +291,7 @@ void interpreter::eval_frame() {
       push_data(std::make_shared<tuple>(std::move(tmp)));
       break;
     }
-    case bytecode::BUILD_LIST: {
+    case BUILD_LIST: {
       auto lst = std::make_shared<list>();
       lst->resize(op_arg);
 
@@ -292,67 +301,41 @@ void interpreter::eval_frame() {
       push_data(lst);
       break;
     }
-    case bytecode::BUILD_MAP: {
+    case BUILD_MAP: {
       auto v = std::make_shared<dict>();
       push_data(v);
       break;
     }
 
-    case bytecode::LOAD_ATTR: {
+    case LOAD_ATTR: {
       auto v = pop_data();
       auto w = cur_frame->get_names()->at(op_arg);
       push_data(v->getattr(w));
       break;
     }
-    case bytecode::COMPARE_OP: {
+    case COMPARE_OP: {
       auto w = pop_data();
       auto v = pop_data();
 
-      switch (op_arg) {
-      case bytecode::compare::less:
+      switch (auto cmp_flag = static_cast<compare>(op_arg); cmp_flag) {
+        using enum compare;
+      case less:
         push_data(v->less(w));
         break;
-      case bytecode::compare::less_equal:
+      case less_equal:
         push_data(v->le(w));
         break;
-      case bytecode::compare::equal:
+      case equal:
         push_data(v->equal(w));
         break;
-      case bytecode::compare::not_equal:
+      case not_equal:
         push_data(v->not_equal(w));
         break;
-      case bytecode::compare::greater:
+      case greater:
         push_data(v->greater(w));
         break;
-      case bytecode::compare::greater_equal:
+      case greater_equal:
         push_data(v->ge(w));
-        break;
-      case bytecode::compare::in:
-        push_data(w->contains(v));
-        break;
-      case bytecode::compare::not_in: {
-        auto r = w->contains(v);
-        if (r == static_value::true_value) {
-          push_data(static_value::false_value);
-        } else {
-          push_data(r);
-        }
-        break;
-      }
-      case bytecode::compare::is:
-        if (v == w) {
-          push_data(static_value::true_value);
-        } else {
-          push_data(static_value::false_value);
-        };
-        break;
-
-      case bytecode::compare::is_not:
-        if (v == w) {
-          push_data(static_value::false_value);
-        } else {
-          push_data(static_value::true_value);
-        };
         break;
       default:
         std::println("Error: Unrecognized compare op {:#4x}", op_arg);
@@ -360,15 +343,15 @@ void interpreter::eval_frame() {
       break;
     }
 
-    case bytecode::JUMP_FORWARD:
+    case JUMP_FORWARD:
       cur_frame->set_pc(cur_frame->get_pc() + op_arg);
       break;
 
-    case bytecode::JUMP_ABSOLUTE:
+    case JUMP_ABSOLUTE:
       cur_frame->set_pc(op_arg);
       break;
 
-    case bytecode::POP_JUMP_IF_FALSE: {
+    case POP_JUMP_IF_FALSE: {
       auto v = pop_data();
       if (v == static_value::false_value) {
         cur_frame->set_pc(op_arg);
@@ -376,7 +359,7 @@ void interpreter::eval_frame() {
       break;
     }
 
-    case bytecode::LOAD_GLOBAL: {
+    case LOAD_GLOBAL: {
       auto target_name = cur_frame->get_names()->at(op_arg);
 
       auto map_finder = [&target_name](auto &&map) {
@@ -397,27 +380,22 @@ void interpreter::eval_frame() {
       break;
     }
 
-    case bytecode::CONTAINS_OP: {
+    case CONTAINS_OP: {
       auto lst = pop_data();
       auto value = pop_data();
       push_data(lst->contains(value));
       break;
     }
 
-    case bytecode::SETUP_LOOP:
-      cur_frame->get_loop_stack().push({op_code, cur_frame->get_pc() + op_arg,
-                                        cur_frame->get_data_stack().size()});
-      break;
-
-    case bytecode::LOAD_FAST:
+    case LOAD_FAST:
       push_data(cur_frame->get_fast_locals()->at(op_arg));
       break;
 
-    case bytecode::STORE_FAST:
+    case STORE_FAST:
       cur_frame->get_fast_locals()->set_at(op_arg, pop_data());
       break;
 
-    case bytecode::CALL_FUNCTION: {
+    case CALL_FUNCTION: {
       std::shared_ptr<std::vector<std::shared_ptr<object>>> args;
       if (op_arg > 0) {
         args = std::make_shared<std::vector<std::shared_ptr<object>>>();
@@ -433,7 +411,7 @@ void interpreter::eval_frame() {
       break;
     }
 
-    case bytecode::MAKE_FUNCTION: {
+    case MAKE_FUNCTION: {
       //[Changed in version 3.11: Qualified name at STACK[-1] was removed.]
       pop_data(); // Qualified name
 
@@ -475,7 +453,7 @@ void interpreter::eval_frame() {
       break;
     }
 
-    case bytecode::LOAD_CLOSURE: {
+    case LOAD_CLOSURE: {
       auto v = cur_frame->get_closure()->at(op_arg);
       if (!v) {
         v = cur_frame->get_cell_from_parameter(op_arg);
@@ -489,7 +467,7 @@ void interpreter::eval_frame() {
       break;
     }
 
-    case bytecode::LOAD_DEREF: {
+    case LOAD_DEREF: {
       auto v = cur_frame->get_closure()->at(op_arg);
       if (v->get_klass() == cell_klass::get_instance()) {
         v = (std::static_pointer_cast<cell>(v))->value();
@@ -498,11 +476,11 @@ void interpreter::eval_frame() {
       break;
     }
 
-    case bytecode::STORE_DEREF:
+    case STORE_DEREF:
       cur_frame->get_closure()->set(op_arg, pop_data());
       break;
 
-    case bytecode::CALL_FUNCTION_KW: {
+    case CALL_FUNCTION_KW: {
       auto args = std::make_shared<std::vector<std::shared_ptr<object>>>();
       if (op_arg > 0) {
         auto tpl = pop_data();
@@ -531,7 +509,7 @@ void interpreter::eval_frame() {
       break;
     }
 
-    case bytecode::BUILD_CONST_KEY_MAP: {
+    case BUILD_CONST_KEY_MAP: {
       auto keys = pop_data();
       assert(keys && keys->get_klass() == tuple_klass::get_instance());
       auto tpl_obj = std::static_pointer_cast<tuple>(keys);
@@ -545,14 +523,14 @@ void interpreter::eval_frame() {
       break;
     }
 
-    case bytecode::LOAD_METHOD: {
+    case LOAD_METHOD: {
       auto v = pop_data();
       auto w = cur_frame->get_names()->at(op_arg); // owner
       push_data(v->getattr(w));
       break;
     }
 
-    case bytecode::CALL_METHOD: {
+    case CALL_METHOD: {
       std::shared_ptr<std::vector<std::shared_ptr<object>>> args;
       if (op_arg > 0) {
         args = std::make_shared<std::vector<std::shared_ptr<object>>>();
@@ -568,7 +546,7 @@ void interpreter::eval_frame() {
       break;
     }
 
-    case bytecode::LIST_EXTEND: {
+    case LIST_EXTEND: {
       auto tpl = pop_data();
       assert(tpl && tpl->get_klass() == tuple_klass::get_instance());
       auto tpl_obj = std::static_pointer_cast<tuple>(tpl);
@@ -585,7 +563,6 @@ void interpreter::eval_frame() {
     }
     default:
       std::println("Error: Unrecognized byte code {:#04x}", op_code);
-    }
     }
   }
 }
