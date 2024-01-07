@@ -6,7 +6,6 @@
 #include "utils/singleton.hpp"
 
 #include <concepts>
-#include <functional>
 #include <string>
 #include <unordered_map>
 
@@ -28,8 +27,8 @@ public:
   void del_subscr(std::shared_ptr<object> x,
                   std::shared_ptr<object> y) override;
 
-  virtual std::shared_ptr<object> getattr(std::shared_ptr<object> x,
-                                          std::shared_ptr<string> y);
+  std::shared_ptr<object> getattr(std::shared_ptr<object> x,
+                                  std::shared_ptr<string> y);
 
   std::shared_ptr<object> allocate_instance(
       std::shared_ptr<object> obj_type,
@@ -103,6 +102,7 @@ private:
 
 public:
   std::shared_ptr<object> iter(std::shared_ptr<object> x) override { return x; }
+  std::shared_ptr<object> next(std::shared_ptr<object> x) override;
 };
 
 class dict_iterator : public object {
@@ -113,10 +113,6 @@ public:
   auto get_owner() { return dic; }
   int get_iter_cnt() { return iter_cnt; }
   void inc_cnt() { iter_cnt++; }
-
-  template <iter_type n>
-  static std::shared_ptr<object> dict_iterator_next(
-      std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
 
 private:
   std::shared_ptr<dict> dic;

@@ -257,25 +257,19 @@ dict_iterator_klass<n>::dict_iterator_klass() {
       "dictionary-valueiterator",
       "dictionary-itemiterator",
   };
-  auto dic = std::make_shared<dict>();
-  dic->insert(string_table::get_instance()->next_str,
-              std::make_shared<function>(dict_iterator::dict_iterator_next<n>));
-  set_dict(dic);
+  set_dict(std::make_shared<dict>());
   set_name(klass_names[n]);
 }
 
-dict_iterator::dict_iterator(std::shared_ptr<dict> owner) : dic{owner} {}
-
 template <iter_type n>
-std::shared_ptr<object> dict_iterator::dict_iterator_next(
-    std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
-
-  auto arg_0 = args->at(0);
-  assert(arg_0->get_klass() == dict_iterator_klass<n>::get_instance());
-  auto dict_iter_obj = std::static_pointer_cast<dict_iterator>(arg_0);
+std::shared_ptr<object>
+dict_iterator_klass<n>::next(std::shared_ptr<object> x) {
+  assert(x->get_klass() == dict_iterator_klass<n>::get_instance());
+  auto dict_iter_obj = std::static_pointer_cast<dict_iterator>(x);
 
   auto dic = dict_iter_obj->get_owner();
   int iter_cnt = dict_iter_obj->get_iter_cnt();
+
   if (iter_cnt < dic->size()) {
     auto iter = dic->get_value().begin();
     iter = std::next(iter, iter_cnt);
@@ -291,8 +285,10 @@ std::shared_ptr<object> dict_iterator::dict_iterator_next(
     }
     dict_iter_obj->inc_cnt();
     return obj;
-  } else // TODO : we need Traceback here to mark iteration end
+  } else // TODO : we need traceback here to mark iteration end
   {
     return nullptr;
   }
 }
+
+dict_iterator::dict_iterator(std::shared_ptr<dict> owner) : dic{owner} {}
