@@ -59,8 +59,7 @@ std::string dict_klass::to_string(std::shared_ptr<object> obj) {
     result += fmt_str(iter->second);
   }
 
-  while (iter != dict_obj->get_value().end()) {
-    ++iter;
+  while (++iter != dict_obj->get_value().end()) {
     result += ", ";
     result += fmt_str(iter->first);
     result += ": ";
