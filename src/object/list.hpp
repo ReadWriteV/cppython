@@ -142,9 +142,13 @@ private:
 
 class list_iterator_klass : public klass,
                             public singleton<list_iterator_klass> {
+  friend class singleton<list_iterator_klass>;
+
+private:
   list_iterator_klass();
 
-  friend class singleton<list_iterator_klass>;
+public:
+  std::shared_ptr<object> next(std::shared_ptr<object> x) override;
 };
 
 class list_iterator : public object {

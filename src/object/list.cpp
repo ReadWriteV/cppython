@@ -336,6 +336,12 @@ list_iterator_klass::list_iterator_klass() {
   set_name("listiterator");
 }
 
+std::shared_ptr<object> list_iterator_klass::next(std::shared_ptr<object> x) {
+  auto args = std::make_shared<std::vector<std::shared_ptr<object>>>();
+  args->push_back(x);
+  return list_iterator::list_iterator_next(args);
+}
+
 list_iterator::list_iterator(std::shared_ptr<list> lst) : lst{lst} {
   set_klass(list_iterator_klass::get_instance());
 }
@@ -353,6 +359,8 @@ std::shared_ptr<object> list_iterator::list_iterator_next(
     auto obj = lst->at(iter_cnt);
     list_iter_obj->inc_cnt();
     return obj;
-  } else // TODO : we need Traceback here to mark iteration end
+  } else {
+    // TODO : we need traceback here to mark iteration end
     return nullptr;
+  }
 }
