@@ -9,7 +9,7 @@ string_table *string_table::get_instance() {
 }
 
 string_table::string_table() {
-  next_str = std::make_shared<string>("next");
+  next_str = std::make_shared<string>("__next__");
   mod_str = std::make_shared<string>("__module__");
   init_str = std::make_shared<string>("__init__");
   add_str = std::make_shared<string>("__add__");

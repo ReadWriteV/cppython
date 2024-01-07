@@ -14,11 +14,9 @@ public:
   static void destroy();
   static std::shared_ptr<object> get_bool_value(bool v);
 
-  static std::shared_ptr<object> true_value;
-  static std::shared_ptr<object> false_value;
-  static std::shared_ptr<object> none_value;
-
-  static std::shared_ptr<std::vector<klass *>> klasses;
+  static inline std::shared_ptr<object> true_value{nullptr};
+  static inline std::shared_ptr<object> false_value{nullptr};
+  static inline std::shared_ptr<object> none_value{nullptr};
 
   static inline std::shared_ptr<object> stop_iteration{nullptr};
 };
