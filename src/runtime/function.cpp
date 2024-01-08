@@ -90,15 +90,7 @@ std::shared_ptr<object> cppython::isinstance(
   assert(y && y->get_klass() == type_klass::get_instance());
   auto type_obj = std::static_pointer_cast<type>(y);
 
-  auto k = x->get_klass();
-
-  for (const auto &e : k->get_mro()->get_value()) {
-    if (e == y) {
-      return static_value::true_value;
-    }
-  }
-
-  return static_value::false_value;
+  return static_value::get_bool_value(x->isinstance(type_obj));
 }
 
 std::shared_ptr<object> cppython::build_class(

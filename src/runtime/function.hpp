@@ -38,6 +38,9 @@ private:
   friend class singleton<method_klass>;
 };
 
+using native_function_t = std::shared_ptr<object>(
+    std::shared_ptr<std::vector<std::shared_ptr<object>>>);
+
 std::shared_ptr<object>
 len(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
 
@@ -61,8 +64,6 @@ std::shared_ptr<object>
 build_class(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
 
 class function : public object {
-  using native_function_t = std::shared_ptr<object>(
-      std::shared_ptr<std::vector<std::shared_ptr<object>>>);
 
 public:
   enum co_flags {

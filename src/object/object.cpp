@@ -1,6 +1,7 @@
 #include "object/object.hpp"
 #include "object/dict.hpp"
 #include "object/klass.hpp"
+#include "object/list.hpp"
 #include "runtime/function.hpp"
 #include "runtime/static_value.hpp"
 #include "runtime/string_table.hpp"
@@ -14,6 +15,13 @@ using namespace cppython;
 void object::set_klass(klass *x) {
   assert(x != nullptr);
   klass_ = x;
+}
+
+bool object::isinstance(std::shared_ptr<type> type_obj) {
+  auto k = get_klass();
+  return k->get_type_object() == type_obj ||
+         std::ranges::any_of(k->get_mro()->get_value(),
+                             std::bind_back(std::equal_to{}, type_obj));
 }
 
 std::string object::to_string() {

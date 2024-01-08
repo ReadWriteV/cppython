@@ -15,3 +15,13 @@ print(c)
 
 d = dict()
 print(d)
+
+
+class A(list):
+    pass
+
+
+e = A()
+print(isinstance(e, list))
+print(isinstance(e, A))
+print(isinstance(e, int))

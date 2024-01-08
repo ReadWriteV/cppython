@@ -22,6 +22,8 @@ public:
   void set_obj_dict(std::shared_ptr<dict> x) { obj_dict = x; }
   [[nodiscard]] auto get_obj_dict() { return obj_dict; }
 
+  bool isinstance(std::shared_ptr<type> type_obj);
+
   [[nodiscard]] std::string to_string();
 
   std::shared_ptr<object> add(std::shared_ptr<object> x);
