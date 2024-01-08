@@ -29,8 +29,10 @@ void list_klass::initialize() {
               std::make_shared<function>(list::list_sort));
   map->insert(std::make_shared<string>("extend"),
               std::make_shared<function>(list::list_extend));
-  map->insert(std::make_shared<string>("__getitem__"),
+  map->insert(string_table::get_instance()->getitem_str,
               std::make_shared<function>(list::list_getitem));
+  map->insert(string_table::get_instance()->repr_str,
+              std::make_shared<function>(list::list_repr));
   set_dict(map);
 
   set_name("list");
@@ -199,7 +201,7 @@ std::shared_ptr<object> list_klass::allocate_instance(
 std::shared_ptr<object>
 list::list_append(std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
   auto arg_0 = args->at(0);
-  assert(arg_0->get_klass() == list_klass::get_instance());
+  assert(arg_0->isinstance(list_klass::get_instance()->get_type_object()));
 
   auto list_obj = std::static_pointer_cast<list>(arg_0);
 
@@ -212,7 +214,7 @@ list::list_append(std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
 std::shared_ptr<object>
 list::list_index(std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
   auto arg_0 = args->at(0);
-  assert(arg_0->get_klass() == list_klass::get_instance());
+  assert(arg_0->isinstance(list_klass::get_instance()->get_type_object()));
 
   auto list_obj = std::static_pointer_cast<list>(arg_0);
 
@@ -233,7 +235,7 @@ list::list_index(std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
 std::shared_ptr<object>
 list::list_pop(std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
   auto arg_0 = args->at(0);
-  assert(arg_0->get_klass() == list_klass::get_instance());
+  assert(arg_0->isinstance(list_klass::get_instance()->get_type_object()));
 
   auto list_obj = std::static_pointer_cast<list>(arg_0);
 
@@ -244,7 +246,7 @@ std::shared_ptr<object>
 list::list_remove(std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
 
   auto arg_0 = args->at(0);
-  assert(arg_0->get_klass() == list_klass::get_instance());
+  assert(arg_0->isinstance(list_klass::get_instance()->get_type_object()));
   auto list_obj = std::static_pointer_cast<list>(arg_0);
 
   auto target = args->at(1);
@@ -267,7 +269,7 @@ std::shared_ptr<object>
 list::list_reverse(std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
 
   auto arg_0 = args->at(0);
-  assert(arg_0->get_klass() == list_klass::get_instance());
+  assert(arg_0->isinstance(list_klass::get_instance()->get_type_object()));
   auto list_obj = std::static_pointer_cast<list>(arg_0);
 
   auto &&lst = list_obj->get_value();
@@ -280,7 +282,7 @@ std::shared_ptr<object>
 list::list_sort(std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
 
   auto arg_0 = args->at(0);
-  assert(arg_0->get_klass() == list_klass::get_instance());
+  assert(arg_0->isinstance(list_klass::get_instance()->get_type_object()));
   auto list_obj = std::static_pointer_cast<list>(arg_0);
 
   auto &&lst = list_obj->get_value();
@@ -297,7 +299,7 @@ std::shared_ptr<object>
 list::list_extend(std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
 
   auto arg_0 = args->at(0);
-  assert(arg_0->get_klass() == list_klass::get_instance());
+  assert(arg_0->isinstance(list_klass::get_instance()->get_type_object()));
   auto list_obj = std::static_pointer_cast<list>(arg_0);
 
   auto obj = args->at(1);
@@ -316,7 +318,7 @@ list::list_extend(std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
 std::shared_ptr<object>
 list::list_getitem(std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
   auto arg_0 = args->at(0);
-  assert(arg_0->get_klass() == list_klass::get_instance());
+  assert(arg_0->isinstance(list_klass::get_instance()->get_type_object()));
   auto list_obj = std::static_pointer_cast<list>(arg_0);
 
   auto arg_1 = args->at(1);
@@ -324,6 +326,37 @@ list::list_getitem(std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
   auto int_obj = std::static_pointer_cast<integer>(arg_1);
 
   return list_obj->at(int_obj->get_value());
+}
+
+std::shared_ptr<object>
+list::list_repr(std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
+  auto arg_0 = args->at(0);
+  assert(arg_0->isinstance(list_klass::get_instance()->get_type_object()));
+  auto list_obj = std::static_pointer_cast<list>(arg_0);
+
+  std::string result;
+
+  result += "[";
+
+  auto fmt_str = [&list_obj](size_t idx) {
+    if (list_obj->at(idx)->get_klass() == string_klass::get_instance()) {
+      return "'" + list_obj->at(idx)->to_string() + "'";
+    } else {
+      return list_obj->at(idx)->to_string();
+    }
+  };
+
+  if (!list_obj->empty()) {
+    result += fmt_str(0);
+  }
+
+  for (size_t i{1}; i < list_obj->size(); ++i) {
+    result += ", ";
+    result += fmt_str(i);
+  }
+
+  result += "]";
+  return std::make_shared<string>(std::move(result));
 }
 
 list_iterator_klass::list_iterator_klass() {

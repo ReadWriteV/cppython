@@ -136,6 +136,9 @@ public:
   static std::shared_ptr<object>
   list_getitem(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
 
+  static std::shared_ptr<object>
+  list_repr(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
+
 private:
   std::vector<std::shared_ptr<object>> value;
 };
