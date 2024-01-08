@@ -1,6 +1,8 @@
 try:
-    raise Exception("something wrong")
+    raise StopIteration("hello")
+except StopIteration as e:
+    print("StopIteration", e)
 except Exception as e:
-    print(e)
+    print("Exception", e)
 finally:
     print("done")
