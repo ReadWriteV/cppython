@@ -15,8 +15,8 @@ void dict_klass::initialize() {
   auto map = std::make_shared<dict>();
   map->insert(std::make_shared<string>("setdefault"),
               std::make_shared<function>(dict::dict_set_default));
-  map->insert(std::make_shared<string>("remove"),
-              std::make_shared<function>(dict::dict_remove));
+  map->insert(std::make_shared<string>("pop"),
+              std::make_shared<function>(dict::dict_pop));
   map->insert(std::make_shared<string>("keys"),
               std::make_shared<function>(dict::dict_keys));
   map->insert(std::make_shared<string>("values"),
@@ -121,9 +121,8 @@ std::shared_ptr<object> dict::at(std::shared_ptr<object> k) {
 }
 
 std::shared_ptr<object> dict::remove(std::shared_ptr<object> k) {
-  auto iter = std::find_if(value.begin(), value.end(), [&k](const auto &item) {
-    return item.first->equal(k) == static_value::true_value;
-  });
+  auto iter = std::find_if(value.begin(), value.end(),
+                           [&](auto &&e) { return value_equal{}(e.first, k); });
   auto tmp = iter->second;
   value.erase(iter);
   return tmp;
@@ -147,7 +146,7 @@ std::shared_ptr<object> dict::dict_set_default(
 }
 
 std::shared_ptr<object>
-dict::dict_remove(std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
+dict::dict_pop(std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
   auto arg_0 = args->at(0);
   assert(arg_0->get_klass() == dict_klass::get_instance());
   auto dict_obj = std::static_pointer_cast<dict>(arg_0);

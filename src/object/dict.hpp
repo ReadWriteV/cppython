@@ -89,7 +89,7 @@ public:
   static std::shared_ptr<object>
   dict_set_default(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
   static std::shared_ptr<object>
-  dict_remove(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
+  dict_pop(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
   static std::shared_ptr<object>
   dict_keys(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
   static std::shared_ptr<object>

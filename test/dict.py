@@ -16,3 +16,17 @@ for k_v in d.items():
 
 for k, v in d.items():
     print(k, v)
+
+
+print(d[1])
+print(d["world"])
+
+d.setdefault(1, 2)
+d.setdefault(2, 3)
+
+print(d[1])
+print(d[2])
+del d[1]
+print(d)
+d.pop(2)
+print(d)
