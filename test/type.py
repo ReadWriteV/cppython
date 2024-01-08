@@ -5,16 +5,25 @@ print(t)
 print(type(t))
 
 a = int()
-print(a)
+print(a, isinstance(a, object))
+
+f = float()
+print(f, isinstance(a, object))
 
 b = str()
-print(b)
+print(b, isinstance(b, object))
 
 c = list()
-print(c)
+print(c, isinstance(c, object))
 
 d = dict()
-print(d)
+print(d, isinstance(d, object))
+
+i = 0
+while i < 5:
+    t = type(t)
+    print(t)
+    i = i + 1
 
 
 class A(list):

@@ -8,3 +8,21 @@ while i < 5:
 
     finally:
         print("hello")
+
+
+def foo():
+    try:
+        return "haha"
+    finally:
+        print("world")
+
+
+print(foo())
+
+for i in range(5):
+    try:
+        if i < 3:
+            continue
+        print(i)
+    finally:
+        print("to be continued")

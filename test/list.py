@@ -3,18 +3,23 @@ s = [5, 2, 0]
 
 print(l)
 
-a = l.__repr__()
+print(l.__repr__())
 
 print(l + s)
 
 print(s * 3)
 
 
-class A(list):
-    pass
+l = [1, "hello"]
+l = ["hello", "world"]
 
+if "hello" in l:
+    print("exist")
+else:
+    print("none")
 
-a = A()
-a.append(3)
-print(a[0])
-print(a)
+print(l[1])
+
+l = [4, 1, 2, 3]
+l.reverse()
+print(l)
