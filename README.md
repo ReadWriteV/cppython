@@ -25,7 +25,8 @@ cmake --build build
 + f-Strings。
 + 实现Python3前端。完成从.py源文件到.pyc的转换，对接到解释器，实现一个完整的流程。
 + 重构代码。这个项目也是我练习C++编码的途径，在不断学习C++的过程中，我也会考虑重构这个项目的代码，增加可读性、健壮性。
-+ 目前在Windows上构建时，无法import DLL。因为拓展的 DLL 库会静态链接code、object、runtime等静态库，这些库中的静态变量（如static_value::klasses）会在 DLL 和 主程序cppython.exe各有一份，这是错误的。此外，DLL 中的静态变量还未初始化，使用时会出现空指针异常（如 new integer{}时，会实例化一个新的 integer_klass，这会调用 klass 的构造函数， klass 构造函数会调用 static_value::klasses->push_back(this)，而此时 static_value::klasses 为nullptr！）。
++ 目前在Windows上构建时，无法import DLL。因为拓展的 DLL 库会静态链接code、object、runtime等静态库，这些库中的静态变量（如integer_klass::instance）会在 DLL 和 主程序cppython.exe各有一份，导致无法通过判断klass来确定类型。
+
 
 ## 参考资料
 
