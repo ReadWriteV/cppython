@@ -23,12 +23,6 @@ void dict_klass::initialize() {
               std::make_shared<function>(dict::dict_values));
   map->insert(std::make_shared<string>("items"),
               std::make_shared<function>(dict::dict_items));
-  map->insert(std::make_shared<string>("iterkeys"),
-              std::make_shared<function>(dict::dict_iterkeys));
-  map->insert(std::make_shared<string>("itervalues"),
-              std::make_shared<function>(dict::dict_itervalues));
-  map->insert(std::make_shared<string>("iteritems"),
-              std::make_shared<function>(dict::dict_iteritems));
   set_dict(map);
   set_name("dict");
   std::make_shared<type>()->set_own_klass(this);
@@ -89,8 +83,6 @@ void dict_klass::store_subscr(std::shared_ptr<object> x,
 
 std::shared_ptr<object> dict_klass::iter(std::shared_ptr<object> x) {
   auto obj = std::make_shared<dict_iterator>(std::static_pointer_cast<dict>(x));
-  obj->set_klass(dict_iterator_klass<iter_key>::get_instance());
-
   return obj;
 }
 
@@ -215,52 +207,13 @@ dict::dict_items(std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
   return items;
 }
 
-std::shared_ptr<object> dict::dict_iterkeys(
-    std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
-  auto arg_0 = args->at(0);
-  assert(arg_0->get_klass() == dict_klass::get_instance());
-  auto dict_obj = std::static_pointer_cast<dict>(arg_0);
-  auto iter = std::make_shared<dict_iterator>(dict_obj);
-  iter->set_klass(dict_iterator_klass<iter_key>::get_instance());
-  return iter;
-}
-
-std::shared_ptr<object> dict::dict_itervalues(
-    std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
-  auto arg_0 = args->at(0);
-  assert(arg_0->get_klass() == dict_klass::get_instance());
-  auto dict_obj = std::static_pointer_cast<dict>(arg_0);
-  auto iter = std::make_shared<dict_iterator>(dict_obj);
-  iter->set_klass(dict_iterator_klass<iter_value>::get_instance());
-  return iter;
-}
-
-std::shared_ptr<object> dict::dict_iteritems(
-    std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
-  auto arg_0 = args->at(0);
-  assert(arg_0->get_klass() == dict_klass::get_instance());
-  auto dict_obj = std::static_pointer_cast<dict>(arg_0);
-  auto iter = std::make_shared<dict_iterator>(dict_obj);
-  iter->set_klass(dict_iterator_klass<iter_item>::get_instance());
-  return iter;
-}
-
-template <iter_type n>
-dict_iterator_klass<n>::dict_iterator_klass() {
-
-  std::string_view klass_names[] = {
-      "dictionary-keyiterator",
-      "dictionary-valueiterator",
-      "dictionary-itemiterator",
-  };
+dict_iterator_klass::dict_iterator_klass() {
+  set_name("dict_keyiterator");
   set_dict(std::make_shared<dict>());
-  set_name(klass_names[n]);
 }
 
-template <iter_type n>
-std::shared_ptr<object>
-dict_iterator_klass<n>::next(std::shared_ptr<object> x) {
-  assert(x->get_klass() == dict_iterator_klass<n>::get_instance());
+std::shared_ptr<object> dict_iterator_klass::next(std::shared_ptr<object> x) {
+  assert(x->get_klass() == dict_iterator_klass::get_instance());
   auto dict_iter_obj = std::static_pointer_cast<dict_iterator>(x);
 
   auto dic = dict_iter_obj->get_owner();
@@ -269,22 +222,14 @@ dict_iterator_klass<n>::next(std::shared_ptr<object> x) {
   if (iter_cnt < dic->size()) {
     auto iter = dic->get_value().begin();
     iter = std::next(iter, iter_cnt);
-    std::shared_ptr<object> obj;
-    if constexpr (n == iter_key) {
-      obj = iter->first;
-    } else if constexpr (n == iter_value) {
-      obj = iter->second;
-    } else if constexpr (n == iter_item) {
-      auto item = std::make_shared<tuple>();
-      item->append(iter->first);
-      item->append(iter->second);
-    }
     dict_iter_obj->inc_cnt();
-    return obj;
-  } else // TODO : we need traceback here to mark iteration end
-  {
+    return iter->first;
+  } else {
+    // TODO : we need traceback here to mark iteration end
     return nullptr;
   }
 }
 
-dict_iterator::dict_iterator(std::shared_ptr<dict> owner) : dic{owner} {}
+dict_iterator::dict_iterator(std::shared_ptr<dict> owner) : dic{owner} {
+  set_klass(dict_iterator_klass::get_instance());
+}

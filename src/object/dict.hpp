@@ -96,25 +96,17 @@ public:
   dict_values(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
   static std::shared_ptr<object>
   dict_items(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
-  static std::shared_ptr<object>
-  dict_iterkeys(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
-  static std::shared_ptr<object>
-  dict_itervalues(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
-  static std::shared_ptr<object>
-  dict_iteritems(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
 
 private:
   std::unordered_map<std::shared_ptr<object>, std::shared_ptr<object>> value;
 };
 
-enum iter_type { iter_key = 0, iter_value, iter_item };
-
-template <iter_type n>
 class dict_iterator_klass : public klass,
-                            public singleton<dict_iterator_klass<n>> {
+                            public singleton<dict_iterator_klass> {
+  friend class singleton<dict_iterator_klass>;
+
 private:
   dict_iterator_klass();
-  friend class singleton<dict_iterator_klass<n>>;
 
 public:
   std::shared_ptr<object> iter(std::shared_ptr<object> x) override { return x; }

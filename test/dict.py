@@ -2,6 +2,9 @@ d = {1: "hello", "world": 2}
 
 print(d)
 
+for k in d:
+    print(k)
+
 for k in d.keys():
     print(k)
 
