@@ -3,6 +3,7 @@
 #include "object/integer.hpp"
 #include "runtime/function.hpp"
 #include "runtime/static_value.hpp"
+#include "runtime/string_table.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -18,7 +19,8 @@ void string_klass::initialize() {
                       std::make_shared<function>(string::string_upper));
   string_dict->insert(std::make_shared<string>("join"),
                       std::make_shared<function>(string::string_join));
-
+  string_dict->insert(string_table::get_instance()->repr_str,
+                      std::make_shared<function>(string::string_repr));
   set_dict(string_dict);
 
   set_name("str");
@@ -171,4 +173,13 @@ std::shared_ptr<object> string::string_join(
 
   auto str_obj = std::static_pointer_cast<string>(arg_0);
   return str_obj->join(args->at(1));
+}
+
+std::shared_ptr<object> string::string_repr(
+    std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
+  auto arg_0 = args->at(0);
+  assert(arg_0->get_klass() == string_klass::get_instance());
+
+  auto str_obj = std::static_pointer_cast<string>(arg_0);
+  return std::make_shared<string>(str_obj->to_string());
 }

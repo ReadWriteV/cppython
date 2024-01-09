@@ -50,6 +50,9 @@ public:
   static std::shared_ptr<object>
   string_join(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
 
+  static std::shared_ptr<object>
+  string_repr(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
+
 private:
   std::string value;
 };
