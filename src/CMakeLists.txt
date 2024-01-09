@@ -8,3 +8,5 @@ add_subdirectory(extlib)
 
 add_executable(cppython main.cpp)
 target_link_libraries(cppython PRIVATE code runtime)
+
+add_dependencies(cppython lib)
