@@ -80,6 +80,9 @@ enum class bytecode : unsigned char {
   JUMP_IF_FALSE_OR_POP = 111, /* Target
                                   byte offset from beginning of code */
 
+  // Pushes AssertionError onto the stack. Used by the assert statement.
+  LOAD_ASSERTION_ERROR = 0x4a,
+
   CONTAINS_OP = 0x76,
 
   JUMP_ABSOLUTE = 113,

@@ -56,12 +56,25 @@ class Exception(object):
     def __init__(self, *args):
         self.info = args
 
+    def exc_str(self, exc_name):
+        if len(self.info) == 0:
+            return exc_name
+        elif len(self.info) == 1:
+            return exc_name + ": " + self.info[0].__repr__()
+        else:
+            return exc_name + ": " + self.info
+
     def __repr__(self):
-        return " ".join(self.info)
+        return self.exc_str("Exception")
 
 
 class StopIteration(Exception):
     pass
+
+
+class AssertionError(Exception):
+    def __repr__(self):
+        return self.exc_str("AssertionError")
 
 
 def xrange(*alist):

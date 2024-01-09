@@ -23,7 +23,7 @@ public:
 
   void run(std::shared_ptr<code_object> codes);
   std::shared_ptr<object>
-  call_virtual(std::shared_ptr<object> func,
+  call_virtual(std::shared_ptr<object> callable,
                std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
   std::shared_ptr<dict> run_module(std::shared_ptr<code_object> codes,
                                    std::shared_ptr<string> module_name);

@@ -59,6 +59,9 @@ void interpreter::initialize() {
 
   builtins->extend(Module::import(std::make_shared<string>("builtin")));
 
+  static_value::assertion_error =
+      builtins->get(std::make_shared<string>("AssertionError"));
+
   static_value::stop_iteration =
       builtins->get(std::make_shared<string>("StopIteration"));
 
@@ -78,7 +81,7 @@ void interpreter::run(std::shared_ptr<code_object> codes) {
     cur_status = status::is_ok;
 
     std::print("{}", trace_back->to_string());
-    std::println("Exception: {}", pending_exception->to_string());
+    std::println("{}", pending_exception->to_string());
 
     trace_back = nullptr;
     pending_exception = nullptr;
@@ -224,6 +227,10 @@ void interpreter::eval_frame() {
 
     case LOAD_BUILD_CLASS: {
       push_data(std::make_shared<function>(cppython::build_class));
+      break;
+    }
+    case LOAD_ASSERTION_ERROR: {
+      push_data(static_value::assertion_error);
       break;
     }
 
@@ -433,7 +440,13 @@ void interpreter::eval_frame() {
       }
       break;
     }
-
+    case POP_JUMP_IF_TRUE: {
+      auto v = pop_data();
+      if (v == static_value::true_value) {
+        cur_frame->set_pc(op_arg);
+      }
+      break;
+    }
     case LOAD_GLOBAL: {
       auto target_name = cur_frame->get_names()->at(op_arg);
 
@@ -802,20 +815,20 @@ void interpreter::leave_frame() {
 }
 
 std::shared_ptr<object> interpreter::call_virtual(
-    std::shared_ptr<object> func,
+    std::shared_ptr<object> callable,
     std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
-  if (func->get_klass() == native_function_klass::get_instance()) {
+  if (callable->get_klass() == native_function_klass::get_instance()) {
     // we do not create a virtual frame, but native frame.
-    return std::static_pointer_cast<function>(func)->call(args);
-  } else if (func->get_klass() == method_klass::get_instance()) {
-    auto method_obj = std::static_pointer_cast<method>(func);
+    return std::static_pointer_cast<function>(callable)->call(args);
+  } else if (callable->get_klass() == method_klass::get_instance()) {
+    auto method_obj = std::static_pointer_cast<method>(callable);
     if (!args) {
       args = std::make_shared<std::vector<std::shared_ptr<object>>>();
     }
     args->insert(args->begin(), method_obj->get_owner());
     return call_virtual(method_obj->get_func(), args);
-  } else if (method::is_function(func)) {
-    auto func_obj = std::static_pointer_cast<function>(func);
+  } else if (method::is_function(callable)) {
+    auto func_obj = std::static_pointer_cast<function>(callable);
     auto new_frame =
         std::make_shared<frame>(func_obj, args, static_cast<int>(args->size()));
     new_frame->set_entry_frame(true);
@@ -823,6 +836,10 @@ std::shared_ptr<object> interpreter::call_virtual(
     eval_frame();
     destroy_frame();
     return ret_value;
+  } else if (callable->get_klass() == type_klass::get_instance()) {
+    auto obj_type = std::static_pointer_cast<type>(callable);
+    auto obj = obj_type->get_own_klass()->allocate_instance(callable, args);
+    return obj;
   }
   return static_value::none_value;
 }
@@ -833,8 +850,6 @@ interpreter::status interpreter::do_raise(std::shared_ptr<object> exc,
 
   assert(exc != nullptr);
 
-  cur_status = status::is_exception;
-
   if (tb == nullptr) {
     tb = std::make_shared<traceback>();
   }
@@ -843,6 +858,7 @@ interpreter::status interpreter::do_raise(std::shared_ptr<object> exc,
     exception_class = exc;
     pending_exception = val;
     trace_back = tb;
+    cur_status = status::is_exception;
     return status::is_exception;
   }
 
@@ -854,6 +870,7 @@ interpreter::status interpreter::do_raise(std::shared_ptr<object> exc,
     exception_class = pending_exception->get_klass()->get_type_object();
   }
   trace_back = tb;
+  cur_status = status::is_exception;
   return status::is_exception;
 }
 

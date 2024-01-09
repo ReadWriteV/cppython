@@ -19,6 +19,7 @@ public:
   static inline std::shared_ptr<object> none_value{nullptr};
 
   static inline std::shared_ptr<object> stop_iteration{nullptr};
+  static inline std::shared_ptr<object> assertion_error{nullptr};
 };
 
 struct value_equal {
