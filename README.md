@@ -20,6 +20,15 @@ cmake -S . -B build
 cmake --build build
 ```
 
+## 测试
+在`test`文件夹下编写待测试的Python程序，然后保存`test\CMakeLists.txt`，触发cmake重新生成test目标，然后通过下面的命令运行所有测试用例：
+
+``` bash
+cd cppython
+
+ctest --test-dir build
+```
+
 ## 未来的工作
 
 + f-Strings。
