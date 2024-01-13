@@ -89,19 +89,32 @@ std::weak_ordering klass::compare(klass *x, klass *y) {
   return x->get_name() <=> y->get_name();
 }
 
-std::string klass::to_string(std::shared_ptr<object> obj) {
+std::shared_ptr<string> klass::str(std::shared_ptr<object> obj) {
+
+  auto str_method = get_klass_attr(obj, string_table::get_instance()->str_str);
+  if (str_method != static_value::none_value) {
+    return interpreter::get_instance()
+        ->call_virtual(str_method, nullptr)
+        ->str();
+  }
+
+  return repr(obj);
+}
+
+std::shared_ptr<string> klass::repr(std::shared_ptr<object> obj) {
 
   auto repr_method =
       get_klass_attr(obj, string_table::get_instance()->repr_str);
   if (repr_method != static_value::none_value) {
     return interpreter::get_instance()
         ->call_virtual(repr_method, nullptr)
-        ->to_string();
+        ->str();
   }
 
-  return std::format("<{} object at {:p}>",
-                     obj->get_klass()->get_type_object()->get_type_name(),
-                     static_cast<void *>(obj.get()));
+  return std::make_shared<string>(
+      std::format("<{} object at {:p}>",
+                  obj->get_klass()->get_type_object()->get_type_name(),
+                  static_cast<void *>(obj.get())));
 }
 
 std::shared_ptr<object> klass::add(std::shared_ptr<object> x,

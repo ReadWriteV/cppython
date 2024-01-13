@@ -1,5 +1,6 @@
 #include "object/float.hpp"
 #include "object/dict.hpp"
+#include "object/string.hpp"
 #include "runtime/static_value.hpp"
 
 #include <cassert>
@@ -17,10 +18,10 @@ void float_klass::initialize() {
   add_super(object_klass::get_instance());
 }
 
-std::string float_klass::to_string(std::shared_ptr<object> obj) {
+std::shared_ptr<string> float_klass::repr(std::shared_ptr<object> obj) {
   auto p = std::static_pointer_cast<float_num>(obj);
   assert(p && (p->get_klass() == this));
-  return std::to_string(p->get_value());
+  return std::make_shared<string>(std::to_string(p->get_value()));
 }
 
 template <typename PredicateOperation>

@@ -34,6 +34,8 @@ void interpreter::initialize() {
   // builtin functions
   builtins->insert(std::make_shared<string>("print"),
                    std::make_shared<function>(print));
+  builtins->insert(std::make_shared<string>("repr"),
+                   std::make_shared<function>(repr));
   builtins->insert(std::make_shared<string>("len"),
                    std::make_shared<function>(len));
   builtins->insert(std::make_shared<string>("iter"),
@@ -80,8 +82,8 @@ void interpreter::run(std::shared_ptr<code_object> codes) {
   if (cur_status == status::is_exception) {
     cur_status = status::is_ok;
 
-    std::print("{}", trace_back->to_string());
-    std::println("{}", pending_exception->to_string());
+    std::print("{}", trace_back->str()->get_value());
+    std::println("{}", pending_exception->str()->get_value());
 
     trace_back = nullptr;
     pending_exception = nullptr;
@@ -797,7 +799,7 @@ void interpreter::build_frame(
       build_frame(m, args, real_arg_cnt, has_kw_arg);
     } else {
       std::println("Error : can not call a normal object <{}>.",
-                   callable->to_string());
+                   callable->str()->get_value());
     }
   }
 }

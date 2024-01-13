@@ -17,6 +17,7 @@ string_table::string_table() {
   call_str = std::make_shared<string>("__call__");
   name_str = std::make_shared<string>("__name__");
   iter_str = std::make_shared<string>("__iter__");
+  str_str = std::make_shared<string>("__str__");
   repr_str = std::make_shared<string>("__repr__");
 
   getitem_str = std::make_shared<string>("__getitem__");

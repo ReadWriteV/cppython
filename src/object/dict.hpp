@@ -18,11 +18,10 @@ class dict_klass : public klass, public singleton<dict_klass> {
 public:
   void initialize();
 
-  std::string to_string(std::shared_ptr<object> obj) override;
+  std::shared_ptr<string> repr(std::shared_ptr<object> obj) override;
+
   std::shared_ptr<object> subscr(std::shared_ptr<object> x,
                                  std::shared_ptr<object> y) override;
-
-  std::shared_ptr<object> iter(std::shared_ptr<object> x) override;
   void store_subscr(std::shared_ptr<object> x, std::shared_ptr<object> y,
                     std::shared_ptr<object> z) override;
   void del_subscr(std::shared_ptr<object> x,
@@ -30,6 +29,8 @@ public:
 
   std::shared_ptr<object> getattr(std::shared_ptr<object> x,
                                   std::shared_ptr<string> y);
+
+  std::shared_ptr<object> iter(std::shared_ptr<object> x) override;
 
   std::shared_ptr<object> allocate_instance(
       std::shared_ptr<object> obj_type,

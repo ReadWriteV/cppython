@@ -20,8 +20,13 @@ struct stack_element {
 };
 
 class traceback_klass : public klass, public singleton<traceback_klass> {
+  friend class singleton<traceback_klass>;
+
+private:
+  traceback_klass();
+
 public:
-  std::string to_string(std::shared_ptr<object> x) override;
+  std::shared_ptr<string> repr(std::shared_ptr<object> x) override;
 };
 
 class traceback : public object {

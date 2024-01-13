@@ -1,4 +1,5 @@
 #include "object/tuple.hpp"
+#include "object/dict.hpp"
 #include "object/integer.hpp"
 #include "object/string.hpp"
 #include "runtime/static_value.hpp"
@@ -10,11 +11,12 @@ using namespace cppython;
 
 tuple_klass::tuple_klass() {
   set_name("tuple");
+  set_dict(std::make_shared<dict>());
   std::make_shared<type>()->set_own_klass(this);
   add_super(object_klass::get_instance());
 }
 
-std::string tuple_klass::to_string(std::shared_ptr<object> obj) {
+std::shared_ptr<string> tuple_klass::repr(std::shared_ptr<object> obj) {
   assert(obj && (obj->get_klass() == this));
   auto tuple_obj = std::static_pointer_cast<tuple>(obj);
 
@@ -24,9 +26,9 @@ std::string tuple_klass::to_string(std::shared_ptr<object> obj) {
 
   auto fmt_str = [&tuple_obj](size_t idx) {
     if (tuple_obj->at(idx)->get_klass() == string_klass::get_instance()) {
-      return "'" + tuple_obj->at(idx)->to_string() + "'";
+      return "'" + tuple_obj->at(idx)->str()->get_value() + "'";
     } else {
-      return tuple_obj->at(idx)->to_string();
+      return tuple_obj->at(idx)->str()->get_value();
     }
   };
 
@@ -40,7 +42,7 @@ std::string tuple_klass::to_string(std::shared_ptr<object> obj) {
   }
 
   result += ")";
-  return result;
+  return std::make_shared<string>(std::move(result));
 }
 
 std::shared_ptr<object> tuple_klass::subscr(std::shared_ptr<object> x,

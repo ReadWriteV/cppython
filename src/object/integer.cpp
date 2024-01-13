@@ -15,10 +15,10 @@ void integer_klass::initialize() {
   add_super(object_klass::get_instance());
 }
 
-std::string integer_klass::to_string(std::shared_ptr<object> obj) {
+std::shared_ptr<string> integer_klass::repr(std::shared_ptr<object> obj) {
   auto p = std::static_pointer_cast<integer>(obj);
   assert(p && (p->get_klass() == this));
-  return std::to_string(p->get_value());
+  return std::make_shared<string>(std::to_string(p->get_value()));
 }
 
 template <typename PredicateOperation>

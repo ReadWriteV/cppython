@@ -2,6 +2,7 @@
 
 #include "object/klass.hpp"
 #include "object/object.hpp"
+#include "object/string.hpp"
 #include "utils/singleton.hpp"
 
 #include <concepts>
@@ -28,7 +29,7 @@ private:
 public:
   void initialize();
 
-  std::string to_string(std::shared_ptr<object> obj) override;
+  std::shared_ptr<string> repr(std::shared_ptr<object> obj) override;
 
   std::shared_ptr<object> greater(std::shared_ptr<object> x,
                                   std::shared_ptr<object> y) override;

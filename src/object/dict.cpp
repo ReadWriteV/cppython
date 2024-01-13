@@ -29,15 +29,15 @@ void dict_klass::initialize() {
   add_super(object_klass::get_instance());
 }
 
-std::string dict_klass::to_string(std::shared_ptr<object> obj) {
+std::shared_ptr<string> dict_klass::repr(std::shared_ptr<object> obj) {
   assert(obj && obj->get_klass() == this);
   auto dict_obj = std::static_pointer_cast<cppython::dict>(obj);
 
   auto fmt_str = [](const std::shared_ptr<object> &v) {
     if (v->get_klass() == string_klass::get_instance()) {
-      return "'" + v->to_string() + "'";
+      return "'" + v->str()->get_value() + "'";
     } else {
-      return v->to_string();
+      return v->str()->get_value();
     }
   };
 
@@ -61,7 +61,7 @@ std::string dict_klass::to_string(std::shared_ptr<object> obj) {
   }
 
   result += "}";
-  return result;
+  return std::make_shared<string>(std::move(result));
 }
 
 std::shared_ptr<object> dict_klass::subscr(std::shared_ptr<object> x,

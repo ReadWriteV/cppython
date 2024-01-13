@@ -35,10 +35,11 @@ method_klass::method_klass() {
   type_obj->set_own_klass(this);
 }
 
-std::string function_klass::to_string(std::shared_ptr<object> obj) {
+std::shared_ptr<string> function_klass::repr(std::shared_ptr<object> obj) {
   auto p = std::static_pointer_cast<function>(obj);
   assert(p && (p->get_klass() == this));
-  return std::format("<function: {}>", p->get_func_name()->to_string());
+  return std::make_shared<string>(
+      std::format("<function: {}>", p->get_func_name()->str()->get_value()));
 }
 
 function::function(std::shared_ptr<object> obj) {
@@ -52,6 +53,12 @@ function::function(std::shared_ptr<object> obj) {
 
 function::function(native_function_t *native_func) : native_func{native_func} {
   set_klass(native_function_klass::get_instance());
+}
+
+std::shared_ptr<object>
+cppython::repr(std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
+  auto arg_0 = args->at(0);
+  return arg_0->repr();
 }
 
 std::shared_ptr<object>
@@ -70,7 +77,7 @@ std::shared_ptr<object>
 cppython::print(std::shared_ptr<std::vector<std::shared_ptr<object>>> args) {
 
   for (auto &e : *args) {
-    std::print("{} ", e->to_string());
+    std::print("{} ", e->str()->get_value());
   }
   std::print("\n");
   return static_value::none_value;
@@ -112,7 +119,7 @@ std::shared_ptr<object> cppython::build_class(
   auto class_name = std::static_pointer_cast<string>(arg_1);
   auto klass_dict = std::static_pointer_cast<dict>(arg_last);
 
-  new_klass->set_name(class_name->to_string());
+  new_klass->set_name(class_name->str()->get_value());
   new_klass->set_super_list(supers_list);
   new_klass->set_dict(klass_dict);
   new_klass->order_supers();

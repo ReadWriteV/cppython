@@ -18,7 +18,7 @@ private:
   code_klass();
 
 public:
-  std::string to_string(std::shared_ptr<object> obj) override;
+  std::shared_ptr<string> repr(std::shared_ptr<object> obj) override;
 };
 
 class code_object : public object {

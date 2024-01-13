@@ -20,7 +20,7 @@ private:
   friend class singleton<function_klass>;
 
 public:
-  std::string to_string(std::shared_ptr<object> obj) override;
+  std::shared_ptr<string> repr(std::shared_ptr<object> obj) override;
 };
 
 class native_function_klass : public klass,
@@ -40,6 +40,9 @@ private:
 
 using native_function_t = std::shared_ptr<object>(
     std::shared_ptr<std::vector<std::shared_ptr<object>>>);
+
+std::shared_ptr<object>
+repr(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);
 
 std::shared_ptr<object>
 len(std::shared_ptr<std::vector<std::shared_ptr<object>>> args);

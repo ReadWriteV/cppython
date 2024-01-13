@@ -1,4 +1,5 @@
 #include "code/code_object.hpp"
+#include "object/string.hpp"
 
 #include <cassert>
 
@@ -10,10 +11,10 @@ code_klass::code_klass() {
   std::make_shared<type>()->set_own_klass(this);
 }
 
-std::string code_klass::to_string(std::shared_ptr<object> obj) {
+std::shared_ptr<string> code_klass::repr(std::shared_ptr<object> obj) {
   auto p = std::static_pointer_cast<code_object>(obj);
   assert(p && (p->get_klass() == this));
-  return "code_object";
+  return std::make_shared<string>("code_object");
 }
 
 code_object::code_object(

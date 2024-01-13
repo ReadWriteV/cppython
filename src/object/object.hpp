@@ -24,7 +24,8 @@ public:
 
   bool isinstance(std::shared_ptr<type> type_obj);
 
-  [[nodiscard]] std::string to_string();
+  [[nodiscard]] std::shared_ptr<string> str();
+  [[nodiscard]] std::shared_ptr<string> repr();
 
   std::shared_ptr<object> add(std::shared_ptr<object> x);
   std::shared_ptr<object> sub(std::shared_ptr<object> x);
@@ -67,7 +68,8 @@ private:
   type_klass() {}
 
 public:
-  std::string to_string(std::shared_ptr<object> obj) override;
+  std::shared_ptr<string> str(std::shared_ptr<object> obj) override;
+  std::shared_ptr<string> repr(std::shared_ptr<object> obj) override;
 
   std::shared_ptr<object> setattr(std::shared_ptr<object> x,
                                   std::shared_ptr<object> y,

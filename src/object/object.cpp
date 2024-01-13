@@ -24,8 +24,12 @@ bool object::isinstance(std::shared_ptr<type> type_obj) {
                              std::bind_back(std::equal_to{}, type_obj));
 }
 
-std::string object::to_string() {
-  return get_klass()->to_string(shared_from_this());
+std::shared_ptr<string> object::str() {
+  return get_klass()->str(shared_from_this());
+}
+
+std::shared_ptr<string> object::repr() {
+  return get_klass()->repr(shared_from_this());
 }
 
 std::shared_ptr<object> object::add(std::shared_ptr<object> x) {
@@ -114,11 +118,16 @@ std::shared_ptr<object> object::len() {
   return get_klass()->len(shared_from_this());
 }
 
-std::string type_klass::to_string(std::shared_ptr<object> obj) {
+std::shared_ptr<string> type_klass::str(std::shared_ptr<object> obj) {
+  return repr(obj);
+}
+
+std::shared_ptr<string> type_klass::repr(std::shared_ptr<object> obj) {
   assert(obj->get_klass() == this);
   auto type_obj = std::static_pointer_cast<type>(obj);
 
-  return std::format("<class '{}'>", type_obj->get_type_name());
+  return std::make_shared<string>(
+      std::format("<class '{}'>", type_obj->get_type_name()));
 }
 
 std::shared_ptr<object> type_klass::setattr(std::shared_ptr<object> x,
@@ -138,7 +147,7 @@ std::string type::get_type_name() {
   if (attr_dict) {
     auto mod = attr_dict->at(string_table::get_instance()->mod_str);
     if (mod != static_value::none_value) {
-      result += mod->to_string();
+      result += mod->str()->get_value();
       result += ".";
     }
   }

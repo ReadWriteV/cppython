@@ -39,7 +39,8 @@ public:
 
   static std::weak_ordering compare(klass *x, klass *y);
 
-  virtual std::string to_string(std::shared_ptr<object> obj);
+  virtual std::shared_ptr<string> str(std::shared_ptr<object> obj);
+  virtual std::shared_ptr<string> repr(std::shared_ptr<object> obj);
 
   virtual std::shared_ptr<object> greater(std::shared_ptr<object> x,
                                           std::shared_ptr<object> y) {

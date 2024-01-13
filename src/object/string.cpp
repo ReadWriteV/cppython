@@ -28,13 +28,13 @@ void string_klass::initialize() {
   add_super(object_klass::get_instance());
 }
 
-std::string string_klass::to_string(std::shared_ptr<object> obj) {
+std::shared_ptr<string> string_klass::repr(std::shared_ptr<object> obj) {
 
   auto p = std::static_pointer_cast<string>(obj);
 
   assert(p && (p->get_klass() == this));
 
-  return p->get_value();
+  return std::make_shared<string>(p->get_value());
 }
 
 std::shared_ptr<object> string_klass::add(std::shared_ptr<object> x,
@@ -181,5 +181,5 @@ std::shared_ptr<object> string::string_repr(
   assert(arg_0->get_klass() == string_klass::get_instance());
 
   auto str_obj = std::static_pointer_cast<string>(arg_0);
-  return std::make_shared<string>(str_obj->to_string());
+  return str_obj->repr();
 }
